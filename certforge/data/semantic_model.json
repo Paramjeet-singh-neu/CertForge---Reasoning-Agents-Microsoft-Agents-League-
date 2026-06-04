@@ -1,0 +1,18 @@
+{
+  "certifications": [
+    {"id":"AZ-204","name":"Azure Developer Associate","skills":["API Development","Azure Functions","Storage","Monitoring","Security"],"recommended_hours":20,"pass_threshold":75,"prerequisite":null,"difficulty":"intermediate","next_cert":"AZ-305"},
+    {"id":"AZ-305","name":"Azure Solutions Architect Expert","skills":["Architecture Design","Cost Optimization","Identity","Data Solutions","Networking"],"recommended_hours":30,"pass_threshold":75,"prerequisite":"AZ-204","difficulty":"advanced","next_cert":null},
+    {"id":"AZ-400","name":"Azure DevOps Engineer Expert","skills":["CI/CD","Monitoring","GitHub Actions","Release Management","IaC"],"recommended_hours":25,"pass_threshold":75,"prerequisite":null,"difficulty":"intermediate","next_cert":null},
+    {"id":"DP-203","name":"Azure Data Engineer Associate","skills":["Synapse","Stream Analytics","Data Lake","Data Factory","Databricks"],"recommended_hours":25,"pass_threshold":75,"prerequisite":null,"difficulty":"intermediate","next_cert":null}
+  ],
+  "roles": [
+    {"role":"Cloud Engineer","primary_cert":"AZ-204","secondary_cert":"AZ-305","career_path":["AZ-204","AZ-305"]},
+    {"role":"DevOps Engineer","primary_cert":"AZ-400","secondary_cert":null,"career_path":["AZ-400"]},
+    {"role":"Data Engineer","primary_cert":"DP-203","secondary_cert":null,"career_path":["DP-203"]}
+  ],
+  "teams": [
+    {"team_id":"TEAM-A","manager":"MGR-001","target_cert":"AZ-204","deadline":"2026-08-01"},
+    {"team_id":"TEAM-B","manager":"MGR-002","target_cert":"Mixed","deadline":"2026-09-01"},
+    {"team_id":"TEAM-C","manager":"MGR-003","target_cert":"AZ-400","deadline":"2026-08-15"}
+  ]
+}

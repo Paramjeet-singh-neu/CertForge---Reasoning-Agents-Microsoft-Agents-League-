@@ -1,0 +1,19 @@
+# ---- Core app ----
+streamlit==1.40.2
+python-dotenv==1.0.1
+pydantic==2.10.4
+pandas==2.2.3
+
+# ---- Azure AI Foundry (agents + models) ----
+azure-ai-projects==1.0.0b10
+azure-ai-agents==1.0.0b3
+azure-identity==1.19.0
+openai==1.59.6
+
+# ---- Reliability & safety (added in a later phase) ----
+azure-ai-evaluation==1.1.0
+azure-monitor-opentelemetry==1.6.4
+opentelemetry-sdk==1.29.0
+
+# ---- Dev ----
+pytest==8.3.4
