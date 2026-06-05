@@ -131,6 +131,21 @@ def search(query: str, k: int = 3, prefer_semantic: bool = True,
 
     Tries semantic (embedding) retrieval; falls back to keyword overlap.
     """
+    # Managed Foundry IQ (Azure AI Search) is the production backend — use it
+    # first when configured and enabled (live mode). Falls back to local on empty.
+    if prefer_semantic and config.foundry_iq_enabled():
+        from .. import foundry_iq
+        hits = foundry_iq.search(query, k=k)
+        if hits:
+            return [{
+                "citation": h["citation"],
+                "section": h["citation"].split(" — ")[-1],
+                "doc": h["citation"].split(" — ")[0],
+                "excerpt": h["excerpt"],
+                "score": 1.0,
+                "retrieval_mode": "foundry_iq",
+            } for h in hits]
+
     chunks = [c for c in load_chunks() if kind is None or c["kind"] == kind]
     mode = "keyword"
     scored: list[tuple[float, dict]] = []

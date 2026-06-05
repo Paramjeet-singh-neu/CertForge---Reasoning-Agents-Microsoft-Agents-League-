@@ -91,13 +91,13 @@ Planner–Executor · Critic/Verifier · Self-reflection · Role specialisation 
   MCP server ([learn_mcp.py](certforge/src/learn_mcp.py)) to fetch **real
   learn.microsoft.com URLs** per skill (live mode; falls back to constructed URLs
   offline). A genuine Model Context Protocol tool integration.
-- **Foundry IQ** — a knowledge base over approved synthetic docs
-  (`knowledge/*.md`) with **real semantic retrieval** ([retriever.py](certforge/src/knowledge/retriever.py)):
-  documents are chunked, embedded, and matched by cosine similarity, returning
-  **cited passages**. The Curator and Assessment agents cite real retrieved
-  content. *Production note:* the retriever interface swaps to a managed Azure
-  Foundry IQ knowledge base (Azure AI Search) without changing the agents — see
-  **Azure status** below.
+- **Foundry IQ** — a **managed Azure AI Search knowledge base** (`certforge-kb`)
+  over the approved synthetic docs (`knowledge/*.md`). The Curator and Assessment
+  agents query it via the `knowledge_base_retrieve` **MCP** tool
+  ([foundry_iq.py](certforge/src/foundry_iq.py)) for **agentic retrieval with
+  cited extractive passages**. A local cosine-similarity retriever
+  ([retriever.py](certforge/src/knowledge/retriever.py)) is the offline fallback —
+  same interface, so the agents don't change.
 - **Fabric IQ** — the semantic model ([semantic_model.json](certforge/data/semantic_model.json)):
   role → certification → skills → recommended hours → pass threshold → prerequisite.
 - **Work IQ** — work signals ([work_signals.json](certforge/data/work_signals.json)):
@@ -214,7 +214,7 @@ certforge/
 | Microsoft Foundry / Agent Framework | **Runs on Foundry**: `gpt-oss-120b` + `text-embedding-3-small` via `AIProjectClient`; Hosted Agent (Responses/Invocations); Foundry IQ retrieval |
 | Reasoning & multi-step | parallel + sequential + feedback loop + adversarial debate + self-reflection |
 | External tools / APIs / MCP | **Microsoft Learn MCP server** (live doc URLs in the Curator); GitHub Models inference + embeddings |
-| ≥1 Microsoft IQ layer | **all three**: Foundry IQ, Fabric IQ, Work IQ |
+| ≥1 Microsoft IQ layer | **all three**: Foundry IQ (managed Azure AI Search KB), Fabric IQ, Work IQ |
 | Synthetic data only | fabricated IDs, no PII; documented |
 | Demoable + documented | 4-view Streamlit UI; this README |
 | Evaluations / telemetry / Responsible AI (extras) | LOO eval (93%), guardrails, telemetry, fairness |

@@ -9,6 +9,10 @@ mcp>=1.0            # Model Context Protocol client (Microsoft Learn MCP server)
 azure-ai-projects>=2.2
 azure-identity>=1.19
 
+# ---- Monitoring: OpenTelemetry -> Azure Application Insights ----
+azure-monitor-opentelemetry>=1.6
+opentelemetry-instrumentation-fastapi>=0.48b0
+
 # ---- Hosted agent (Foundry Agent Service deployment) ----
 fastapi>=0.115
 uvicorn>=0.30

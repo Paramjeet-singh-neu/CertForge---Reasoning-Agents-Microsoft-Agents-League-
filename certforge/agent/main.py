@@ -22,6 +22,7 @@ handlers (see DEPLOY.md); the core logic — analyze() — is unchanged.
 """
 from __future__ import annotations
 
+import os
 import re
 import sys
 import time
@@ -39,6 +40,46 @@ from src.memory import procedural_memory  # noqa: E402
 from src.pipeline import runner  # noqa: E402
 
 app = FastAPI(title="CertForge Hosted Agent", version="1.0")
+
+# Monitoring: emit OpenTelemetry traces to Azure Application Insights. Explicitly
+# configure + instrument the app, and log the outcome so it's verifiable in logs.
+# Note: APPLICATIONINSIGHTS_CONNECTION_STRING is reserved/managed by Foundry Agent
+# Service, and ';' in env values can be mangled by the platform — so we pass the
+# connection string base64-encoded via CERTFORGE_APPI_CONN_B64 and decode it here.
+import base64  # noqa: E402
+
+_appi_conn = None
+# Hex-encoded (only 0-9a-f, immune to env-value mangling of ; = / + by the host).
+_hex = os.getenv("CERTFORGE_APPI_CONN_HEX")
+if _hex:
+    try:
+        _appi_conn = bytes.fromhex(_hex.strip()).decode("utf-8").strip()
+    except Exception:
+        _appi_conn = None
+if not _appi_conn:
+    _b64 = os.getenv("CERTFORGE_APPI_CONN_B64")
+    if _b64:
+        try:
+            _appi_conn = base64.b64decode(_b64).decode("utf-8").strip()
+        except Exception:
+            _appi_conn = None
+_appi_conn = (_appi_conn or os.getenv("CERTFORGE_APPI_CONN")
+              or os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"))
+if _appi_conn:
+    try:
+        from azure.monitor.opentelemetry import configure_azure_monitor
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+        # The platform pre-sets APPLICATIONINSIGHTS_CONNECTION_STRING="" (empty),
+        # which the SDK reads over our parameter — so overwrite it explicitly.
+        os.environ["APPLICATIONINSIGHTS_CONNECTION_STRING"] = _appi_conn
+        configure_azure_monitor(connection_string=_appi_conn, logger_name="certforge")
+        FastAPIInstrumentor.instrument_app(app)
+        print("[CertForge] App Insights monitoring ENABLED", flush=True)
+    except Exception as e:  # never block startup; platform monitoring still applies
+        print(f"[CertForge] App Insights not configured ({e}); "
+              f"using platform monitoring (azd ai agent monitor)", flush=True)
+
 procedural_memory.seed_baseline()
 
 _EMP = re.compile(r"\b(EMP-\d+)\b", re.I)

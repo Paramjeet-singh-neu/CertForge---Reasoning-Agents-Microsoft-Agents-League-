@@ -22,6 +22,10 @@ environment_variables:
     # response completes within the hosted request timeout.
     - name: CERTFORGE_MAX_LOOPS
       value: "1"
+    # Monitoring: OpenTelemetry -> App Insights. Uses CERTFORGE_APPI_CONN because
+    # APPLICATIONINSIGHTS_CONNECTION_STRING is reserved/managed by Agent Service.
+    - name: CERTFORGE_APPI_CONN_HEX
+      value: "496e737472756d656e746174696f6e4b65793d33336634653265662d373165662d346538322d616566662d3638323534646337303038663b496e67657374696f6e456e64706f696e743d68747470733a2f2f6561737475732d382e696e2e6170706c69636174696f6e696e7369676874732e617a7572652e636f6d2f"
 code_configuration:
     runtime: python_3_13
     entry_point: agent/main.py

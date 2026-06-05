@@ -59,6 +59,16 @@ PROJECT_ENDPOINT = os.getenv("PROJECT_ENDPOINT", "")
 MODEL_DEPLOYMENT = os.getenv("MODEL_DEPLOYMENT", "gpt-4o-mini")
 FOUNDRY_IQ_KB_ID = os.getenv("FOUNDRY_IQ_KB_ID", "")
 
+# --- Foundry IQ knowledge base (managed Azure AI Search agentic retrieval) ---
+FOUNDRY_IQ_ENDPOINT = os.getenv("FOUNDRY_IQ_ENDPOINT", "")   # https://<svc>.search.windows.net
+FOUNDRY_IQ_KB = os.getenv("FOUNDRY_IQ_KB", "")               # knowledge base name
+FOUNDRY_IQ_KEY = os.getenv("FOUNDRY_IQ_KEY", "")             # search api-key (secret)
+FOUNDRY_IQ_API_VERSION = os.getenv("FOUNDRY_IQ_API_VERSION", "2026-05-01-preview")
+
+
+def foundry_iq_enabled() -> bool:
+    return bool(FOUNDRY_IQ_ENDPOINT and FOUNDRY_IQ_KB and FOUNDRY_IQ_KEY)
+
 
 # ---------------------------------------------------------------------------
 # Synthetic data loaders (cached so repeated agent calls don't re-read disk)
