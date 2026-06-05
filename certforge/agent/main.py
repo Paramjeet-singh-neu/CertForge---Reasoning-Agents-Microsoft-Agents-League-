@@ -97,6 +97,7 @@ def analyze(text_or_params) -> dict:
         cert = text_or_params.get("certification")
         hours = int(text_or_params.get("available_hours_per_week", 6))
         team = text_or_params.get("team")
+        topics = text_or_params.get("topics", "")
     else:
         text = str(text_or_params)
         m_emp, m_cert, m_hours = _EMP.search(text), _CERT.search(text), _HOURS.search(text)
@@ -104,13 +105,14 @@ def analyze(text_or_params) -> dict:
         cert = m_cert.group(1).upper() if m_cert else None
         hours = int(m_hours.group(1)) if m_hours else 6
         team = [e.upper() for e in _EMP.findall(text)] if "team" in text.lower() else None
+        topics = ""
 
     if team and len(team) > 1:
         return runner.run_team_analysis(team)
 
     learner = config.get_learner(emp) or {"role": "Cloud Engineer", "certification": "AZ-204"}
     cert = cert or learner["certification"]
-    return runner.run_analysis(emp, learner["role"], cert, hours)
+    return runner.run_analysis(emp, learner["role"], cert, hours, topics=topics)
 
 
 def summarize(result: dict) -> str:

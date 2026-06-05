@@ -79,12 +79,16 @@ def learner_view():
             learner["certification"]),
     )
     hours = col3.number_input("Hrs/week", min_value=2, max_value=20, value=6)
+    topics = st.text_input(
+        "Topics you want to focus on (optional)",
+        placeholder="e.g. Storage, Monitoring, Azure Functions",
+        help="Free-text topics — the Learning Path Curator prioritises matching skills.")
     st.caption(f"Role: **{learner['role']}**  ·  Team signal loaded from Work IQ")
 
     if st.button("🚀 Analyse Readiness", type="primary"):
         with st.spinner("Agents reasoning..."):
             st.session_state.result = runner.run_analysis(
-                emp, learner["role"], cert, hours)
+                emp, learner["role"], cert, hours, topics=topics)
 
     result = st.session_state.get("result")
     if not result or result["learner_profile"]["employee_id"] != emp:
@@ -113,8 +117,28 @@ def learner_view():
                    f"{a['overall_score']}% across {loops} feedback iterations.")
 
     st.markdown("#### Skill Scores")
+    matched = result.get("curator", {}).get("topics_matched_to_skills")
+    if matched:
+        st.caption(f"🎯 Prioritised your requested topics: {', '.join(matched)}")
     for s in a["skill_scores"]:
         score_bar(s["skill"], s["score"], s["status"])
+
+    # --- Engagement: study windows + adaptive reminder schedule -----------
+    eng = result.get("engagement", {})
+    reminders = eng.get("reminder_schedule", [])
+    if reminders:
+        with st.expander("📅 Engagement — Study Windows & Reminder Schedule", expanded=False):
+            wa = eng.get("work_analysis", {})
+            st.caption(f"Capacity risk: **{wa.get('capacity_risk','?').upper()}** · "
+                       f"{wa.get('meeting_hours','?')} mtg hrs / {wa.get('focus_hours','?')} "
+                       f"focus hrs · preferred {wa.get('preferred_slot','?')}")
+            rs = eng.get("reminder_strategy", {})
+            st.caption(f"Cadence: **{rs.get('frequency')}** · tone {rs.get('tone')} · "
+                       f"{rs.get('escalation')}")
+            st.dataframe(pd.DataFrame([
+                {"Day": r["day"], "Time": r["time"], "Channel": r.get("channel", ""),
+                 "Reminder": r["message"]} for r in reminders
+            ]), use_container_width=True, hide_index=True)
 
     # --- Gamification -----------------------------------------------------
     g = result["manager_individual"]["gamification"]

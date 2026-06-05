@@ -9,6 +9,8 @@ free-text suggestions.
 """
 from __future__ import annotations
 
+import re
+
 from .. import config, learn_mcp
 from ..knowledge import retriever
 from .base import Agent
@@ -26,6 +28,9 @@ class LearningPathCurator(Agent):
             return {"agent_name": self.name, "confidence": 0.0, "error": "unknown certification"}
 
         weak = set(context.get("known_weak_areas", []))
+        # Learner-requested topics (baseline-flow step 1) bump matching skills.
+        topics = context.get("learner_topics", "") or ""
+        topic_words = {t.strip().lower() for t in re.split(r"[,;]| and ", topics) if t.strip()}
         semantic = not config.use_mock()
 
         # MS Learn MCP: fetch REAL learn.microsoft.com URLs for every skill in one
@@ -38,9 +43,12 @@ class LearningPathCurator(Agent):
             learn_hits = learn_mcp.search_many(list(qmap.values()), k=2)
             used_mcp = any(learn_hits.values())
 
-        skills_out, sources, total_hours = [], set(), 0
+        skills_out, sources, total_hours, matched_topics = [], set(), 0, set()
         for skill in cert["skills"]:
-            priority = "high" if skill in weak else "medium"
+            is_topic = any(w in skill.lower() or skill.lower() in w for w in topic_words)
+            if is_topic:
+                matched_topics.add(skill)
+            priority = "high" if (skill in weak or is_topic) else "medium"
             real = learn_hits.get(qmap[skill], [])
             modules = self._modules_for(skill, cert["id"], real)
             for m in modules:
@@ -65,9 +73,13 @@ class LearningPathCurator(Agent):
             "required_skills": skills_out,
             "prerequisites": [cert["prerequisite"]] if cert["prerequisite"] else [],
             "total_estimated_hours": total_hours,
+            "requested_topics": sorted(topic_words) if topic_words else [],
+            "topics_matched_to_skills": sorted(matched_topics),
             "sources_cited": sorted(sources),
             "learn_mcp_used": used_mcp,
             "reasoning_trace": self.trace(
+                f"Prioritised learner topics: {', '.join(sorted(matched_topics))}"
+                if matched_topics else "",
                 f"Retrieved grounded content from Foundry IQ knowledge base "
                 f"({'semantic' if semantic else 'keyword'} retrieval)",
                 f"Mapped {len(cert['skills'])} skills to learning modules",

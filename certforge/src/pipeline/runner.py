@@ -42,8 +42,12 @@ PARALLEL_AGENTS = [
 
 
 def run_analysis(employee_id: str, role: str, certification: str,
-                 available_hours_per_week: int = 6) -> dict:
-    """Run the full multi-agent analysis for one learner. Returns the result dict."""
+                 available_hours_per_week: int = 6, topics: str = "") -> dict:
+    """Run the full multi-agent analysis for one learner. Returns the result dict.
+
+    `topics` is optional free-text the learner wants to focus on (baseline-flow
+    step 1); the Curator uses it to prioritise matching skills.
+    """
     # INPUT GUARDRAIL: gate the request before any agent runs.
     ok, issues = guardrails.validate_input(employee_id, role, certification)
     if not ok:
@@ -63,6 +67,7 @@ def run_analysis(employee_id: str, role: str, certification: str,
             "certification": certification,
             "available_hours_per_week": available_hours_per_week,
         },
+        "learner_topics": topics.strip(),
         "loop_iteration": 1,
     }
     event_log: list[dict] = []

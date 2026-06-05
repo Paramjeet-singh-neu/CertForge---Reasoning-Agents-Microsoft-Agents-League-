@@ -45,6 +45,8 @@ class EngagementAgent(Agent):
             flags.append("Capacity risk: recommend manager protects study time")
 
         windows = self._windows(slot)
+        frequency = "daily" if risk != "low" else "every other day"
+        reminder_schedule = self._reminders(windows, risk)
 
         return {
             "agent_name": self.name,
@@ -58,17 +60,39 @@ class EngagementAgent(Agent):
             },
             "study_windows": windows,
             "reminder_strategy": {
-                "frequency": "daily" if risk != "low" else "every other day",
+                "frequency": frequency,
                 "tone": "encouraging",
                 "escalation": "If 2 sessions missed → notify manager",
             },
+            "reminder_schedule": reminder_schedule,
             "flags": flags,
             "reasoning_trace": self.trace(
                 f"Read Work IQ signals: {meeting} mtg hrs, {focus} focus hrs, {slot} slot",
                 f"Capacity risk assessed: {risk.upper()} ({capacity_reasoning})",
                 f"Recommended {len(windows)} study window(s) around focus blocks",
+            f"Built {len(reminder_schedule)} adaptive reminder(s) ({risk}-risk cadence)",
             ),
         }
+
+    def _reminders(self, windows: list[dict], risk: str) -> list[dict]:
+        """Concrete reminders mapped to each study window, tone adapted to risk."""
+        lead = "🔴 Protected study time —" if risk == "high" else "📚"
+        out = []
+        for w in windows:
+            out.append({
+                "day": w["day"],
+                "time": w["time"],
+                "channel": "Teams + calendar",
+                "message": f"{lead} {w['day']} {w['time']}: focus session ({w['reasoning']}).",
+            })
+        if risk != "low":
+            out.append({
+                "day": "Friday",
+                "time": "4 PM",
+                "channel": "Teams",
+                "message": "Weekly check-in: log your practice score and flag blockers.",
+            })
+        return out
 
     def _windows(self, slot: str) -> list[dict]:
         table = {
