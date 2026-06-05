@@ -18,8 +18,97 @@ from .base import Agent
 HIGH_MEETING_THRESHOLD = 20
 
 
+VALID_VERDICTS = {"READY", "NEEDS_ADJUSTMENT", "CRITICAL_GAPS"}
+
+
 class ReadinessCritic(Agent):
     name = "ReadinessCritic"
+
+    system_prompt = (
+        "You are the Readiness Critic for CertForge, the hardest reviewer in an "
+        "enterprise certification system. You review other agents' findings "
+        "ADVERSARIALLY and back every challenge with the pattern evidence given. "
+        "Do not be agreeable — your job is to catch over-optimism.\n\n"
+        "VERDICT RUBRIC (apply strictly):\n"
+        "- READY: overall_score >= pass_threshold AND pass_rate_for_profile >= 0.70.\n"
+        "- CRITICAL_GAPS: pass_rate_for_profile < 0.45, or score far below threshold.\n"
+        "- NEEDS_ADJUSTMENT: anything in between.\n"
+        "The pass_rate_for_profile ALREADY reflects any extra study applied this "
+        "iteration — trust it as the learner's current projected odds.\n\n"
+        "Rules:\n"
+        "- Even when you return READY, you may note residual caveats in challenges.\n"
+        "- Challenge the study plan only if the timeline is unrealistic for the work load.\n"
+        "- Cite the provided evidence verbatim in each challenge.\n\n"
+        "Return ONLY JSON with this exact shape:\n"
+        "{\n"
+        '  "verdict": "READY" | "NEEDS_ADJUSTMENT" | "CRITICAL_GAPS",\n'
+        '  "review_summary": "<2 sentences>",\n'
+        '  "challenges": [{"target_agent": "...", "target_claim": "...", '
+        '"challenge": "...", "evidence": "...", "severity": "critical|significant|minor", '
+        '"revised_recommendation": "..."}],\n'
+        '  "gaps_identified": ["..."],\n'
+        '  "approved_findings": ["..."],\n'
+        '  "reasoning_trace": ["step 1", "step 2"]\n'
+        "}"
+    )
+
+    def _user_payload(self, context: dict) -> dict:
+        a = context.get("assessment", {}).get("assessment", {})
+        patterns = context.get("patterns", {})
+        plan = context.get("study_plan", {}).get("plan", {})
+        work = context.get("engagement", {}).get("work_analysis", {})
+        return {
+            "loop_iteration": context.get("loop_iteration", 1),
+            "assessment": {
+                "overall_score": a.get("overall_score"),
+                "readiness_status": a.get("readiness_status"),
+                "pass_threshold": a.get("pass_threshold"),
+                "weak_skills": [s["skill"] for s in a.get("skill_scores", [])
+                                if s.get("status") == "weak"],
+            },
+            "pattern_evidence": {
+                "pass_rate_for_profile": patterns.get("pass_rate"),
+                "patterns": patterns.get("patterns", []),
+                "success_factors": patterns.get("success_factors", []),
+                "failure_factors": patterns.get("failure_factors", []),
+            },
+            "study_plan": {"total_weeks": plan.get("total_weeks"),
+                           "total_hours": plan.get("total_hours")},
+            "work_context": {"meeting_hours": work.get("meeting_hours"),
+                             "capacity_risk": work.get("capacity_risk")},
+        }
+
+    def _apply_live(self, baseline: dict, llm_out: dict, context: dict) -> dict:
+        verdict = str(llm_out.get("verdict", "")).upper().strip()
+        if verdict not in VALID_VERDICTS:
+            # LLM produced an invalid verdict -> trust the deterministic one.
+            return baseline
+
+        # GUARDRAIL: keep the LLM's rich critique, but enforce hard verdict bounds
+        # so the feedback loop reliably converges and over/under-confidence can't
+        # slip through. (Responsible-AI style bound on an LLM decision.)
+        a = context.get("assessment", {}).get("assessment", {})
+        score = a.get("overall_score", 0)
+        threshold = a.get("pass_threshold", 75)
+        pass_rate = context.get("patterns", {}).get("pass_rate", 0.5)
+        if score >= threshold and pass_rate >= 0.70:
+            verdict = "READY"
+        elif pass_rate < 0.45:
+            verdict = "CRITICAL_GAPS"
+
+        loop_rec = "PROCEED" if verdict == "READY" else "TRIGGER_FEEDBACK_LOOP"
+        merged = dict(baseline)
+        merged.update({
+            "verdict": verdict,
+            "review_summary": llm_out.get("review_summary", baseline["review_summary"]),
+            "challenges": llm_out.get("challenges", baseline["challenges"]),
+            "gaps_identified": llm_out.get("gaps_identified", baseline["gaps_identified"]),
+            "approved_findings": llm_out.get("approved_findings", baseline["approved_findings"]),
+            "reasoning_trace": llm_out.get("reasoning_trace", baseline["reasoning_trace"]),
+            "loop_recommendation": loop_rec,
+            "powered_by": "llm",
+        })
+        return merged
 
     def _run_mock(self, context: dict) -> dict:
         assessment = context.get("assessment", {})

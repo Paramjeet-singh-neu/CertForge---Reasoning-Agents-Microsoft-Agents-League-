@@ -19,6 +19,48 @@ CONFIDENCE_THRESHOLD = 0.70
 class AssessmentAgent(Agent):
     name = "AssessmentAgent"
 
+    system_prompt = (
+        "You are the Assessment Agent for CertForge. You write grounded, cited "
+        "practice questions and perform SELF-REFLECTION on your own confidence.\n\n"
+        "You are given the skills and the (already-computed) score/status for each. "
+        "Do NOT change the scores. Your job is to:\n"
+        "1. Write 1 credible, certification-level practice question per weak skill, "
+        "each with a plausible cited source (e.g. 'Engineering Cert Guide, Section X').\n"
+        "2. Produce a self_reflection_log: for any weak skill, narrate noticing low "
+        "confidence, re-querying the knowledge base, and revising the question.\n\n"
+        "Return ONLY JSON:\n"
+        "{\n"
+        '  "sample_questions": [{"question": "...", "skill": "...", "source": "...", '
+        '"difficulty": "easy|medium|hard"}],\n'
+        '  "self_reflection_log": ["..."],\n'
+        '  "reasoning_trace": ["..."]\n'
+        "}"
+    )
+
+    def _user_payload(self, context: dict) -> dict:
+        from .. import config
+        cert = config.get_certification(context["learner_profile"]["certification"])
+        weak = set(context.get("known_weak_areas", []))
+        return {
+            "certification": cert["id"] if cert else context["learner_profile"]["certification"],
+            "skills": cert["skills"] if cert else [],
+            "weak_skills": sorted(weak),
+        }
+
+    def _apply_live(self, baseline: dict, llm_out: dict, context: dict) -> dict:
+        # Keep the deterministic, data-grounded scores; enrich the qualitative parts.
+        merged = dict(baseline)
+        if llm_out.get("sample_questions"):
+            merged["assessment"] = {**baseline["assessment"],
+                                    "sample_questions": llm_out["sample_questions"]}
+        if llm_out.get("self_reflection_log"):
+            merged["self_reflection_log"] = llm_out["self_reflection_log"]
+            merged["self_reflection_triggered"] = True
+        if llm_out.get("reasoning_trace"):
+            merged["reasoning_trace"] = llm_out["reasoning_trace"]
+        merged["powered_by"] = "llm"
+        return merged
+
     def _run_mock(self, context: dict) -> dict:
         profile = context["learner_profile"]
         cert = config.get_certification(profile["certification"])

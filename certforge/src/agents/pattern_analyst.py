@@ -25,6 +25,8 @@ def _passed(learner: dict) -> bool:
 
 class PerformancePatternAnalyst(Agent):
     name = "PerformancePatternAnalyst"
+    #: Always deterministic — we want trustworthy math, never an LLM's guess.
+    deterministic = True
 
     def _run_mock(self, context: dict) -> dict:
         profile = context["learner_profile"]

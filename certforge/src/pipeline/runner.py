@@ -96,11 +96,20 @@ def run_analysis(employee_id: str, role: str, certification: str,
             revision = context["study_plan"]["plan"].get("revision_focus") or {}
             cumulative_hours += revision.get("additional_hours", 6)
             cumulative_exams += 1
+            new_rate = OutcomePredictor.recompute(
+                base_pass_rate, coeffs,
+                add_hours=cumulative_hours, add_exams=cumulative_exams)
+            # Update BOTH the number and the evidence text so the deterministic
+            # and LLM critics see a consistent story (no stale "33%" lingering).
             context["patterns"] = {
                 **context["patterns"],
-                "pass_rate": OutcomePredictor.recompute(
-                    base_pass_rate, coeffs,
-                    add_hours=cumulative_hours, add_exams=cumulative_exams),
+                "pass_rate": new_rate,
+                "patterns": [{
+                    "pattern": f"Projected pass rate after added study: {int(new_rate*100)}%",
+                    "evidence": f"+{cumulative_hours} hrs and +{cumulative_exams} practice "
+                                f"exam(s) applied to base {int(base_pass_rate*100)}%",
+                    "confidence": 0.75,
+                }],
             }
             event_log.append({"agent": "FeedbackLoop", "trace": [
                 f"Iteration {iteration}: revised plan (+{cumulative_hours} hrs, "

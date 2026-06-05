@@ -34,8 +34,17 @@ def use_mock() -> bool:
     return os.getenv("CERTFORGE_MOCK", "true").lower() == "true"
 
 
+# --- LLM provider (live mode) ---------------------------------------------
+# We default to GitHub Models (free, no Azure quota/region walls). The agents
+# don't care which provider answers — they just need a JSON-capable chat model.
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "github")  # "github" | "azure"
+LLM_MODEL = os.getenv("LLM_MODEL", "openai/gpt-4o-mini")
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+GITHUB_MODELS_ENDPOINT = os.getenv("GITHUB_MODELS_ENDPOINT", "https://models.github.ai/inference")
+
+# --- Azure AI Foundry (optional; for Foundry IQ knowledge layer) -----------
 PROJECT_ENDPOINT = os.getenv("PROJECT_ENDPOINT", "")
-MODEL_DEPLOYMENT = os.getenv("MODEL_DEPLOYMENT", "gpt-4o")
+MODEL_DEPLOYMENT = os.getenv("MODEL_DEPLOYMENT", "gpt-4o-mini")
 FOUNDRY_IQ_KB_ID = os.getenv("FOUNDRY_IQ_KB_ID", "")
 
 
