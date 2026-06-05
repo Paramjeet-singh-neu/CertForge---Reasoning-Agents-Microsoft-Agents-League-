@@ -31,6 +31,7 @@ from ..agents.pattern_analyst import PerformancePatternAnalyst
 from ..agents.predictor import OutcomePredictor
 from ..agents.study_plan import StudyPlanGenerator
 from ..memory import procedural_memory
+from ..safety import guardrails
 
 PARALLEL_AGENTS = [
     ("curator", LearningPathCurator),
@@ -43,6 +44,18 @@ PARALLEL_AGENTS = [
 def run_analysis(employee_id: str, role: str, certification: str,
                  available_hours_per_week: int = 6) -> dict:
     """Run the full multi-agent analysis for one learner. Returns the result dict."""
+    # INPUT GUARDRAIL: gate the request before any agent runs.
+    ok, issues = guardrails.validate_input(employee_id, role, certification)
+    if not ok:
+        return {
+            "blocked": True,
+            "guardrail_report": {"passed": False, "violations": issues,
+                                 "transparency_notice": guardrails.TRANSPARENCY_NOTICE},
+            "learner_profile": {"employee_id": employee_id, "role": role,
+                                "certification": certification},
+            "event_log": [{"agent": "InputGuardrail", "trace": issues}],
+        }
+
     context: dict = {
         "learner_profile": {
             "employee_id": employee_id,
@@ -154,6 +167,11 @@ def run_analysis(employee_id: str, role: str, certification: str,
     context["patterns_learned"] = procedural_memory.learn_from_result(certification, context)
 
     context["event_log"] = event_log
+    # OUTPUT GUARDRAIL: attach a well-formedness + safety report.
+    guardrails.assert_safe_output(context)
+    # TELEMETRY: record an observability summary + append to the trace log.
+    from .. import telemetry
+    context["telemetry"] = telemetry.record(context)
     return context
 
 

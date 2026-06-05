@@ -13,6 +13,7 @@ and explainable, not invented.
 """
 from __future__ import annotations
 
+import math
 from statistics import mean
 
 from .. import config
@@ -21,6 +22,17 @@ from .base import Agent
 
 def _passed(learner: dict) -> bool:
     return learner["exam_outcome"].lower() == "pass"
+
+
+def _sigmoid(x: float) -> float:
+    return 1 / (1 + math.exp(-x))
+
+
+def _personal_signal(score: float, hours: float, exams: float) -> float:
+    """Pass-likelihood from the learner's OWN metrics, grounded in the synthetic
+    success factors (>~75% practice, >~20 hrs, 2+ practice exams). Centred so a
+    typical-threshold learner sits near 0.5."""
+    return _sigmoid((score - 72) / 8 + (hours - 20) / 6 + (exams - 2) / 2)
 
 
 class PerformancePatternAnalyst(Agent):
@@ -49,15 +61,26 @@ class PerformancePatternAnalyst(Agent):
         ]
         match_pool = matches or cohort  # fall back to whole cohort if no close match
         passers = [l for l in match_pool if _passed(l)]
-        pass_rate = round(len(passers) / len(match_pool), 2) if match_pool else 0.0
+        cohort_rate = round(len(passers) / len(match_pool), 2) if match_pool else 0.5
+
+        # Blend the cohort signal with the learner's own metrics. When the cohort
+        # match is tight we trust it more; when it's a loose fallback we lean on
+        # the learner's personal signal (their own hours/score/exams).
+        my_exams = me.get("practice_exams_taken", profile.get("practice_exams_taken", 1))
+        personal = _personal_signal(my_score, my_hours, my_exams)
+        tight = bool(matches) and len(match_pool) >= 2
+        w_cohort = 0.6 if tight else 0.3
+        pass_rate = round(w_cohort * cohort_rate + (1 - w_cohort) * personal, 2)
 
         # --- Derive what-if coefficients from the cohort -------------------
         coeffs = self._coefficients(cohort)
 
         patterns = [
             {
-                "pattern": f"Pass rate at this profile: {int(pass_rate * 100)}%",
-                "evidence": f"{len(passers)}/{len(match_pool)} matching learners passed",
+                "pattern": f"Estimated pass probability: {int(pass_rate * 100)}%",
+                "evidence": f"{len(passers)}/{len(match_pool)} matching learners passed "
+                            f"(cohort {int(cohort_rate*100)}%, personal signal "
+                            f"{int(personal*100)}%, {'tight' if tight else 'loose'} match)",
                 "confidence": 0.78,
             }
         ]

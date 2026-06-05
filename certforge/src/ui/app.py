@@ -18,10 +18,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import pandas as pd  # noqa: E402
 import streamlit as st  # noqa: E402
 
-from src import config  # noqa: E402
+from src import config, telemetry  # noqa: E402
 from src.agents.predictor import OutcomePredictor  # noqa: E402
+from src.evaluation import evaluate  # noqa: E402
 from src.memory import procedural_memory  # noqa: E402
 from src.pipeline import runner  # noqa: E402
+from src.safety import guardrails  # noqa: E402
 
 st.set_page_config(page_title="CertForge", page_icon="🎓", layout="wide")
 
@@ -226,6 +228,60 @@ def trace_view():
 
 
 # ---------------------------------------------------------------------------
+# Reliability & Safety view
+# ---------------------------------------------------------------------------
+def reliability_view():
+    st.subheader("🛡️ Reliability & Safety")
+    st.caption("Evaluation, Responsible-AI guardrails, and telemetry — the "
+               "evidence that CertForge is accurate, safe, and observable.")
+
+    if st.button("📏 Run Evaluation (all 15 learners)", type="primary"):
+        with st.spinner("Evaluating against ground-truth outcomes..."):
+            st.session_state.eval = evaluate.evaluate_all()
+
+    ev = st.session_state.get("eval")
+    if ev:
+        acc = ev["predictive_accuracy"]
+        st.markdown("#### 1. Predictive Accuracy (leave-one-out vs actual outcomes)")
+        c = st.columns(4)
+        c[0].metric("Accuracy", acc["accuracy"])
+        c[1].metric("Precision", acc["precision"])
+        c[2].metric("Recall", acc["recall"])
+        c[3].metric("F1", acc["f1"])
+        st.caption(f"{acc['correct']}/{acc['total']} correct · {acc['method']}")
+
+        g, s, f = ev["groundedness"], ev["safety"], ev["fairness"]
+        st.markdown("#### 2. Groundedness & Safety")
+        c = st.columns(3)
+        c[0].metric("Question citations", g["avg_question_citation_ratio"])
+        c[1].metric("Curator citations", g["curator_citation_rate"])
+        c[2].metric("Output guardrail pass", s["output_guardrail_pass_rate"])
+
+        st.markdown("#### 3. Fairness (predicted pass rate by role)")
+        st.write(f["predicted_pass_rate_by_role"])
+        flag = "🟢 OK" if f["flag"] == "ok" else "🟡 REVIEW"
+        st.caption(f"Max disparity across roles: {f['max_disparity']} → {flag}")
+
+    st.divider()
+    st.markdown("#### 4. Telemetry (recent runs)")
+    traces = telemetry.read_traces(10)
+    if traces:
+        st.dataframe(pd.DataFrame([
+            {"time": t["timestamp"][11:19], "learner": t.get("employee_id"),
+             "cert": t.get("certification"), "engine": t["engine"],
+             "loops": t["loop_iterations"], "secs": t["total_agent_seconds"],
+             "verdict": t.get("verdict"), "guardrail": "✅" if t.get("guardrail_passed") else "❌"}
+            for t in reversed(traces)
+        ]), use_container_width=True, hide_index=True)
+    else:
+        st.info("No telemetry yet — run a learner or team analysis first.")
+
+    st.divider()
+    st.markdown("#### 🤝 Transparency")
+    st.warning(guardrails.TRANSPARENCY_NOTICE)
+
+
+# ---------------------------------------------------------------------------
 # Layout
 # ---------------------------------------------------------------------------
 st.title("🎓 CertForge — Certification Intelligence")
@@ -234,11 +290,16 @@ st.caption("8-agent reasoning system · Microsoft IQ-grounded · "
 mode = "🟢 MOCK mode (local)" if config.use_mock() else "☁️ Azure mode"
 st.sidebar.markdown(f"**Engine:** {mode}")
 st.sidebar.markdown("---")
-view = st.sidebar.radio("View", ["👤 Learner", "📊 Manager", "🔍 Reasoning Trace"])
+view = st.sidebar.radio(
+    "View", ["👤 Learner", "📊 Manager", "🔍 Reasoning Trace", "🛡️ Reliability"])
+st.sidebar.markdown("---")
+st.sidebar.caption("⚠️ AI decision-support. Synthetic data only, for demonstration.")
 
 if view.startswith("👤"):
     learner_view()
 elif view.startswith("📊"):
     manager_view()
-else:
+elif view.startswith("🔍"):
     trace_view()
+else:
+    reliability_view()
