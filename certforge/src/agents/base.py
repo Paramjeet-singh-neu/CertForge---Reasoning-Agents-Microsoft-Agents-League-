@@ -72,6 +72,8 @@ class Agent(ABC):
             payload = self._user_payload(context)
             llm_out = llm.chat_json(self.system_prompt, json.dumps(payload, default=str))
         except llm.LLMError as e:
+            import sys as _sys
+            print(f"[CertForge] {self.name} LLM fallback to mock: {e}", file=_sys.stderr, flush=True)
             baseline.setdefault("reasoning_trace", []).append(f"(LLM unavailable, used mock: {e})")
             baseline["live_fallback"] = True
             return baseline

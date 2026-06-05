@@ -9,11 +9,10 @@ free-text suggestions.
 """
 from __future__ import annotations
 
-from .. import config
+from .. import config, learn_mcp
+from ..knowledge import retriever
 from .base import Agent
 
-# Synthetic stand-in for what the Microsoft Learn MCP server would return.
-# In Azure mode this is replaced by a real MCP tool call.
 _MODULE_HOURS = {"lab": 3, "reading": 2, "video": 1}
 
 
@@ -27,14 +26,37 @@ class LearningPathCurator(Agent):
             return {"agent_name": self.name, "confidence": 0.0, "error": "unknown certification"}
 
         weak = set(context.get("known_weak_areas", []))
+        semantic = not config.use_mock()
+
+        # MS Learn MCP: fetch REAL learn.microsoft.com URLs for every skill in one
+        # session (live mode only; best-effort with fallback to constructed URLs).
+        qmap = {s: (s if s.lower().startswith("azure") else f"Azure {s}")
+                for s in cert["skills"]}
+        learn_hits = {}
+        used_mcp = False
+        if not config.use_mock():
+            learn_hits = learn_mcp.search_many(list(qmap.values()), k=2)
+            used_mcp = any(learn_hits.values())
+
         skills_out, sources, total_hours = [], set(), 0
         for skill in cert["skills"]:
             priority = "high" if skill in weak else "medium"
-            modules = self._modules_for(skill, cert["id"])
+            real = learn_hits.get(qmap[skill], [])
+            modules = self._modules_for(skill, cert["id"], real)
             for m in modules:
                 total_hours += m["estimated_hours"]
                 sources.add(m["source"])
-            skills_out.append({"skill": skill, "priority": priority, "modules": modules})
+            # Foundry IQ grounding: cite a real retrieved passage for this skill.
+            q = skill if skill.lower().startswith("azure") else f"Azure {skill}"
+            grounding = retriever.search(q, k=1, prefer_semantic=semantic, kind="content")
+            if grounding:
+                sources.add(grounding[0]["citation"])
+            skills_out.append({
+                "skill": skill,
+                "priority": priority,
+                "modules": modules,
+                "grounding": grounding[0] if grounding else None,
+            })
 
         return {
             "agent_name": self.name,
@@ -44,16 +66,33 @@ class LearningPathCurator(Agent):
             "prerequisites": [cert["prerequisite"]] if cert["prerequisite"] else [],
             "total_estimated_hours": total_hours,
             "sources_cited": sorted(sources),
+            "learn_mcp_used": used_mcp,
             "reasoning_trace": self.trace(
-                f"Queried Foundry IQ for {cert['id']} skill requirements",
+                f"Retrieved grounded content from Foundry IQ knowledge base "
+                f"({'semantic' if semantic else 'keyword'} retrieval)",
                 f"Mapped {len(cert['skills'])} skills to learning modules",
-                f"Pulled module metadata from Microsoft Learn (MCP)",
-                f"Total estimated effort: {total_hours} hrs across {len(cert['skills'])} skills",
+                f"Microsoft Learn MCP: {'fetched real doc URLs' if used_mcp else 'using fallback URLs (MCP not called/offline)'}",
+                f"Cited {len(sources)} real sources; "
+                f"{total_hours} hrs across {len(cert['skills'])} skills",
             ),
         }
 
-    def _modules_for(self, skill: str, cert_id: str) -> list[dict]:
-        """Two cited modules per skill (a reading + a hands-on lab)."""
+    def _modules_for(self, skill: str, cert_id: str, real: list[dict] | None = None) -> list[dict]:
+        """Cited modules per skill. Uses real MS Learn (MCP) URLs when available,
+        otherwise falls back to constructed learn.microsoft.com URLs."""
+        real = real or []
+        if real:
+            modules = []
+            for i, hit in enumerate(real[:2]):
+                modules.append({
+                    "title": hit["title"],
+                    "source": "Microsoft Learn (MCP)",
+                    "url": hit["url"],
+                    "estimated_hours": _MODULE_HOURS["reading" if i == 0 else "lab"],
+                    "type": "reading" if i == 0 else "lab",
+                })
+            return modules
+
         slug = skill.lower().replace(" ", "-")
         return [
             {
@@ -65,7 +104,7 @@ class LearningPathCurator(Agent):
             },
             {
                 "title": f"{skill} hands-on lab",
-                "source": "MS Learn MCP",
+                "source": "MS Learn (fallback)",
                 "url": f"https://learn.microsoft.com/training/modules/{slug}-lab",
                 "estimated_hours": _MODULE_HOURS["lab"],
                 "type": "lab",

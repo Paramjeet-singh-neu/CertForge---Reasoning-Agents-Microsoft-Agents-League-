@@ -1,0 +1,34 @@
+# Foundry Hosted Agent version definition for CertForge.
+# Read by the Foundry Toolkit / azd when deploying to Foundry Agent Service.
+# (See DEPLOY.md for the full deployment walkthrough.)
+
+name: certforge
+description: >
+  An 8-agent enterprise certification-intelligence system. Plans, assesses,
+  debates, predicts, loops, and learns — grounded in Microsoft IQ layers.
+
+language: python
+entrypoint: certforge/agent/main.py
+
+# Protocols this container exposes. Responses powers the playground demo;
+# Invocations carries the structured analysis contract.
+protocols:
+  - responses
+  - invocations
+
+# Per-session sandbox sizing (smallest tier is plenty for this workload).
+resources:
+  cpu: "0.5"
+  memory: "1Gi"
+
+# Configuration passed to the container at runtime. Secrets (GITHUB_TOKEN) come
+# from a Key Vault connection, NOT baked into the image (see DEPLOY.md).
+env:
+  CERTFORGE_MOCK: "false"
+  LLM_PROVIDER: "github"          # swap to "azure" to use the Foundry model
+  LLM_MODEL: "openai/gpt-4o-mini"
+  # PROJECT_ENDPOINT and MODEL_DEPLOYMENT are injected by Foundry when
+  # LLM_PROVIDER=azure (the deployed Foundry model, e.g. gpt-4.1).
+
+port: 8088
+healthcheck: /healthz

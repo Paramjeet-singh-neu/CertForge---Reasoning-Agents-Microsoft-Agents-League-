@@ -9,11 +9,16 @@ pipeline/runner.py — separating "what to do" from "doing it" keeps each testab
 """
 from __future__ import annotations
 
+import os
+
 from .. import config
 from ..memory import procedural_memory
 from .base import Agent
 
-MAX_LOOPS = 3
+# Max feedback-loop iterations. Configurable so a latency-constrained hosted
+# agent (slow reasoning model + request timeout) can cap it to 1, while local
+# runs keep the full multi-loop narrative.
+MAX_LOOPS = int(os.getenv("CERTFORGE_MAX_LOOPS", "3"))
 
 
 class Orchestrator(Agent):

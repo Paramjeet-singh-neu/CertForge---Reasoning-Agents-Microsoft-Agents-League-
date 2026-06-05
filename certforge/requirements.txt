@@ -1,19 +1,17 @@
-# ---- Core app ----
-streamlit==1.40.2
-python-dotenv==1.0.1
-pydantic==2.10.4
-pandas==2.2.3
+# ---- Core (required) ----
+streamlit>=1.40
+python-dotenv>=1.0
+pandas>=2.2
+openai>=1.59        # OpenAI-compatible client for GitHub Models (and Azure OpenAI)
+mcp>=1.0            # Model Context Protocol client (Microsoft Learn MCP server)
 
-# ---- Azure AI Foundry (agents + models) ----
-azure-ai-projects==1.0.0b10
-azure-ai-agents==1.0.0b3
-azure-identity==1.19.0
-openai==1.59.6
+# ---- Microsoft Foundry (LLM_PROVIDER=azure) ----
+azure-ai-projects>=2.2
+azure-identity>=1.19
 
-# ---- Reliability & safety (added in a later phase) ----
-azure-ai-evaluation==1.1.0
-azure-monitor-opentelemetry==1.6.4
-opentelemetry-sdk==1.29.0
+# ---- Hosted agent (Foundry Agent Service deployment) ----
+fastapi>=0.115
+uvicorn>=0.30
 
-# ---- Dev ----
-pytest==8.3.4
+# ---- Dev / test ----
+pytest>=8.3

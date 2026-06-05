@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .. import config
 
-_STORE = config.DATA_DIR / "memory_store.json"
+_STORE = config.state_dir() / "memory_store.json"
 
 
 def _read() -> list[dict]:
@@ -25,7 +25,10 @@ def _read() -> list[dict]:
 
 
 def _write(patterns: list[dict]) -> None:
-    _STORE.write_text(json.dumps(patterns, indent=2), encoding="utf-8")
+    try:
+        _STORE.write_text(json.dumps(patterns, indent=2), encoding="utf-8")
+    except OSError:
+        pass  # read-only filesystem (hosted container) — memory is best-effort
 
 
 def all_patterns() -> list[dict]:

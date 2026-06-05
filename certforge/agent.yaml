@@ -1,0 +1,28 @@
+kind: hosted
+name: certforge
+protocols:
+    - protocol: responses
+      version: 1.0.0
+environment_variables:
+    - name: AZURE_AI_MODEL_DEPLOYMENT_NAME
+      value: ${AZURE_AI_MODEL_DEPLOYMENT_NAME}
+    - name: CERTFORGE_STATE_DIR
+      value: /tmp/certforge
+    # Run the in-container agent on Foundry models (gpt-oss-120b) via the agent's
+    # managed identity (DefaultAzureCredential -> Foundry User role).
+    - name: CERTFORGE_MOCK
+      value: "false"
+    - name: LLM_PROVIDER
+      value: azure
+    - name: AZURE_MODEL
+      value: gpt-oss-120b
+    - name: PROJECT_ENDPOINT
+      value: ${FOUNDRY_PROJECT_ENDPOINT}
+    # gpt-oss is a slow reasoning model; cap loops to 1 so a Foundry-powered
+    # response completes within the hosted request timeout.
+    - name: CERTFORGE_MAX_LOOPS
+      value: "1"
+code_configuration:
+    runtime: python_3_13
+    entry_point: agent/main.py
+    dependency_resolution: remote_build

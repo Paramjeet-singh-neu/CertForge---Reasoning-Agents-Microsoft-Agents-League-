@@ -11,6 +11,7 @@ agent checking itself — distinct from the Critic, which checks it externally.
 from __future__ import annotations
 
 from .. import config
+from ..knowledge import retriever
 from .base import Agent
 
 CONFIDENCE_THRESHOLD = 0.70
@@ -25,7 +26,8 @@ class AssessmentAgent(Agent):
         "You are given the skills and the (already-computed) score/status for each. "
         "Do NOT change the scores. Your job is to:\n"
         "1. Write 1 credible, certification-level practice question per weak skill, "
-        "each with a plausible cited source (e.g. 'Engineering Cert Guide, Section X').\n"
+        "grounded in the provided knowledge_base_passages. Cite the EXACT 'source' "
+        "string from the matching passage — do not invent sources.\n"
         "2. Produce a self_reflection_log: for any weak skill, narrate noticing low "
         "confidence, re-querying the knowledge base, and revising the question.\n\n"
         "Return ONLY JSON:\n"
@@ -38,13 +40,21 @@ class AssessmentAgent(Agent):
     )
 
     def _user_payload(self, context: dict) -> dict:
-        from .. import config
         cert = config.get_certification(context["learner_profile"]["certification"])
-        weak = set(context.get("known_weak_areas", []))
+        weak = sorted(set(context.get("known_weak_areas", [])))
+        cert_id = cert["id"] if cert else context["learner_profile"]["certification"]
+        # Retrieve real passages so the LLM grounds questions and cites real sources.
+        grounding = []
+        for skill in (weak or (cert["skills"][:2] if cert else [])):
+            q = skill if skill.lower().startswith("azure") else f"Azure {skill}"
+            for hit in retriever.search(q, k=1, kind="content"):
+                grounding.append({"skill": skill, "source": hit["citation"],
+                                  "excerpt": hit["excerpt"]})
         return {
-            "certification": cert["id"] if cert else context["learner_profile"]["certification"],
+            "certification": cert_id,
             "skills": cert["skills"] if cert else [],
-            "weak_skills": sorted(weak),
+            "weak_skills": weak,
+            "knowledge_base_passages": grounding,
         }
 
     def _apply_live(self, baseline: dict, llm_out: dict, context: dict) -> dict:
@@ -144,12 +154,16 @@ class AssessmentAgent(Agent):
 
     def _sample_questions(self, cert: dict, weak: set) -> list[dict]:
         target = next((s for s in cert["skills"] if s in weak), cert["skills"][0])
+        # Ground the citation in a real retrieved passage (Foundry IQ).
+        q = target if target.lower().startswith("azure") else f"Azure {target}"
+        hits = retriever.search(q, k=1, prefer_semantic=not config.use_mock(), kind="content")
+        source = hits[0]["citation"] if hits else "Engineering Cert Guide"
         return [
             {
                 "question": f"Which {target} configuration is most cost-effective for a "
                 f"production {cert['id']} workload?",
                 "skill": target,
-                "source": "Engineering Cert Guide, Section 4.3",
+                "source": source,
                 "difficulty": "medium",
             }
         ]

@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 from . import config
 
-_TRACE_FILE = config.DATA_DIR / "telemetry.jsonl"
+_TRACE_FILE = config.state_dir() / "telemetry.jsonl"
 
 
 def summarize(result: dict) -> dict:
@@ -38,7 +38,7 @@ def summarize(result: dict) -> dict:
         "agent_invocations": len(spans),
         "loop_iterations": result.get("loop_iterations_run", 1),
         "llm_powered_agents": llm_agents,
-        "engine": "mock" if config.use_mock() else f"llm:{config.LLM_MODEL}",
+        "engine": "mock" if config.use_mock() else f"{config.LLM_PROVIDER}:{config.chat_model()}",
         "guardrail_passed": result.get("guardrail_report", {}).get("passed"),
         "verdict": result.get("critic", {}).get("verdict"),
     }
@@ -60,8 +60,11 @@ def record(result: dict) -> dict:
         "certification": result.get("learner_profile", {}).get("certification"),
         **summary,
     }
-    with open(_TRACE_FILE, "a", encoding="utf-8") as f:
-        f.write(json.dumps(record) + "\n")
+    try:
+        with open(_TRACE_FILE, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record) + "\n")
+    except OSError:
+        pass  # read-only filesystem (e.g. hosted container) — telemetry is best-effort
     return summary
 
 

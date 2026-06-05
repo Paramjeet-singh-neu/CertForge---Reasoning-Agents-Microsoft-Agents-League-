@@ -19,6 +19,7 @@ env/
 # Runtime artifacts (regenerated at runtime)
 certforge/data/memory_store.json
 certforge/data/telemetry.jsonl
+certforge/data/kb_embeddings.json
 
 # OS / editor
 .DS_Store

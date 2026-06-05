@@ -39,6 +39,18 @@ def use_mock() -> bool:
 # don't care which provider answers — they just need a JSON-capable chat model.
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "github")  # "github" | "azure"
 LLM_MODEL = os.getenv("LLM_MODEL", "openai/gpt-4o-mini")
+EMBED_MODEL = os.getenv("EMBED_MODEL", "openai/text-embedding-3-small")
+# Foundry (azure provider) model names — bare ids for Instant Models (no deployment).
+AZURE_MODEL = os.getenv("AZURE_MODEL", "gpt-4.1-mini")
+AZURE_EMBED_MODEL = os.getenv("AZURE_EMBED_MODEL", "text-embedding-3-small")
+
+
+def chat_model() -> str:
+    return AZURE_MODEL if LLM_PROVIDER == "azure" else LLM_MODEL
+
+
+def embed_model() -> str:
+    return AZURE_EMBED_MODEL if LLM_PROVIDER == "azure" else EMBED_MODEL
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 GITHUB_MODELS_ENDPOINT = os.getenv("GITHUB_MODELS_ENDPOINT", "https://models.github.ai/inference")
 
@@ -51,6 +63,20 @@ FOUNDRY_IQ_KB_ID = os.getenv("FOUNDRY_IQ_KB_ID", "")
 # ---------------------------------------------------------------------------
 # Synthetic data loaders (cached so repeated agent calls don't re-read disk)
 # ---------------------------------------------------------------------------
+def state_dir() -> Path:
+    """Writable directory for runtime artifacts (memory, telemetry, embedding cache).
+
+    Defaults to the data dir for local dev, but in a read-only hosted container
+    (Foundry Agent Service) set CERTFORGE_STATE_DIR to a writable path (e.g. /tmp).
+    """
+    d = Path(os.getenv("CERTFORGE_STATE_DIR", str(DATA_DIR)))
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    return d
+
+
 def _load_json(name: str):
     with open(DATA_DIR / name, "r", encoding="utf-8") as f:
         return json.load(f)
