@@ -104,7 +104,7 @@ ADVERSARIAL_CASES = [
      "certification": "AZ-204", "expect_blocked": True},
     {"name": "Out-of-scope certification", "employee_id": "EMP-001",
      "role": "Cloud Engineer", "certification": "AWS-SAA", "expect_blocked": True},
-    {"name": "Real-name identifier", "employee_id": "Paramjeet Singh",
+    {"name": "Real-name identifier", "employee_id": "Jordan Lee",
      "role": "Cloud Engineer", "certification": "AZ-204", "expect_blocked": True},
     {"name": "Valid synthetic request", "employee_id": "EMP-001",
      "role": "Cloud Engineer", "certification": "AZ-204", "expect_blocked": False},
