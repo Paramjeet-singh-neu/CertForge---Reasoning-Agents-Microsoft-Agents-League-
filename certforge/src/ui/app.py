@@ -165,12 +165,18 @@ def learner_view():
     a = result["assessment"]["assessment"]
     verdict = result["critic"]["verdict"]
     loops = result["loop_iterations_run"]
+    # Color-coded verdict banner.
+    _v = {"READY": (st.success, "✅ READY"),
+          "NEEDS_ADJUSTMENT": (st.warning, "⚠️ NEEDS ADJUSTMENT"),
+          "CRITICAL_GAPS": (st.error, "🔴 CRITICAL GAPS")}
+    _fn, _label = _v.get(verdict, (st.info, verdict))
+    _fn(f"### {_label} — {a['overall_score']}% overall  ·  {loops} feedback loop(s)")
     c1, c2, c3 = st.columns(3)
-    c1.metric("Overall score", f"{a['overall_score']}%")
+    c1.metric("Overall score", f"{a['overall_score']}%", help="Mean of per-skill scores")
     c2.metric("Critic verdict", verdict)
     c3.metric("Feedback loops", loops)
     if loops > 1:
-        st.success(f"Improved from {result['initial_score']}% to "
+        st.caption(f"📈 Improved from {result['initial_score']}% to "
                    f"{a['overall_score']}% across {loops} feedback iterations.")
 
     st.markdown("#### Skill Scores")
@@ -337,6 +343,26 @@ def reliability_view():
         st.caption(f"Max disparity across roles: {f['max_disparity']} → {flag}")
 
     st.divider()
+    st.markdown("#### 🔬 Live-mode Evaluation (real LLM path)")
+    st.caption("Validates the *live* agents (Foundry `gpt-oss-120b`): did they use the "
+               "LLM, ground via the managed Foundry IQ KB, return valid verdicts, and "
+               "pass guardrails. ⚠️ Slow (~2–4 min for 1 learner — gpt-oss reasoning).")
+    if st.button("🔬 Run Live-mode Eval (1 learner)"):
+        with st.spinner("Running the full pipeline on the live LLM... (~2–4 min)"):
+            st.session_state.live_eval = evaluate.evaluate_live(["EMP-001"])
+    le = st.session_state.get("live_eval")
+    if le and not le.get("error"):
+        lc = st.columns(4)
+        lc[0].metric("LLM-powered", f"{int(le['llm_powered_rate']*100)}%")
+        lc[1].metric("Foundry IQ grounding", f"{int(le['avg_foundry_iq_grounding']*100)}%")
+        lc[2].metric("Verdict validity", f"{int(le['verdict_validity']*100)}%")
+        lc[3].metric("Avg latency", f"{le['avg_seconds']}s")
+        st.caption(f"Engine: {le['per_learner'][0]['engine'] if le.get('per_learner') else '—'} "
+                   f"· guardrail pass {int(le['guardrail_pass_rate']*100)}%")
+    elif le:
+        st.info(le["error"])
+
+    st.divider()
     st.markdown("#### 4. Telemetry (recent runs)")
     traces = telemetry.read_traces(10)
     if traces:
@@ -368,16 +394,27 @@ def reliability_view():
 # ---------------------------------------------------------------------------
 # Layout
 # ---------------------------------------------------------------------------
-st.title("🎓 CertForge — Certification Intelligence")
-st.caption("8-agent reasoning system · Microsoft IQ-grounded · "
-           "synthetic data only, for demonstration")
-mode = "🟢 MOCK mode (local)" if config.use_mock() else "☁️ Azure mode"
+st.markdown(
+    "<h1 style='margin-bottom:0'>🎓 CertForge</h1>"
+    "<p style='color:#5b6770; font-size:1.05rem; margin-top:0.2rem'>"
+    "An 8-agent certification-intelligence system that <b>debates your readiness, "
+    "predicts your outcome, and gets smarter with every learner.</b></p>",
+    unsafe_allow_html=True)
+st.caption("Microsoft Foundry · all 3 IQ layers · synthetic data only, for demonstration")
+
+# Sidebar: branding + engine + IQ-layer status.
+mode = "🟢 MOCK (local, instant)" if config.use_mock() else f"☁️ Foundry · {config.chat_model()}"
+st.sidebar.markdown("### 🎓 CertForge")
 st.sidebar.markdown(f"**Engine:** {mode}")
+st.sidebar.markdown(
+    f"**IQ layers:** Foundry IQ {'🟢' if config.foundry_iq_enabled() else '⚪'} · "
+    f"Fabric IQ 🟢 · Work IQ 🟢")
 st.sidebar.markdown("---")
 view = st.sidebar.radio(
     "View", ["👤 Learner", "📊 Manager", "🔍 Reasoning Trace", "🛡️ Reliability"])
 st.sidebar.markdown("---")
-st.sidebar.caption("⚠️ AI decision-support. Synthetic data only, for demonstration.")
+st.sidebar.caption("⚠️ AI decision-support — a human reviews readiness decisions. "
+                   "Synthetic data only, for demonstration.")
 
 if view.startswith("👤"):
     learner_view()

@@ -126,6 +126,68 @@ def _fairness(rows: list[dict]) -> dict:
     }
 
 
+def evaluate_live(sample: list[str] | None = None) -> dict:
+    """Live-mode evaluation: run a small sample through the REAL LLM agents and
+    measure LLM-path quality (vs the deterministic 93% predictive eval).
+
+    Metrics: did the reasoning agents actually use the LLM (not fall back), did
+    grounding come from the managed Foundry IQ KB, are verdicts valid, did the
+    output guardrail pass, and end-to-end latency. Small sample by design — the
+    reasoning model is slow.
+    """
+    import os
+    import time
+
+    from .. import llm
+
+    sample = sample or ["EMP-001", "EMP-009", "EMP-008"]
+    if not llm.is_configured():
+        return {"error": "No LLM configured (set GITHUB_TOKEN or LLM_PROVIDER=azure + az login)."}
+
+    prev_mock = os.environ.get("CERTFORGE_MOCK")
+    os.environ["CERTFORGE_MOCK"] = "false"  # force the live LLM path
+    rows = []
+    try:
+        for emp in sample:
+            learner = config.get_learner(emp)
+            if not learner:
+                continue
+            t = time.time()
+            r = runner.run_analysis(emp, learner["role"], learner["certification"])
+            elapsed = round(time.time() - t, 1)
+            assessment, critic = r.get("assessment", {}), r.get("critic", {})
+            grounded = [s for s in r.get("curator", {}).get("required_skills", [])
+                        if (s.get("grounding") or {}).get("retrieval_mode") == "foundry_iq"]
+            n_skills = len(r.get("curator", {}).get("required_skills", [])) or 1
+            rows.append({
+                "employee_id": emp,
+                "assessment_llm": assessment.get("powered_by") == "llm",
+                "critic_llm": critic.get("powered_by") == "llm",
+                "foundry_iq_grounding": round(len(grounded) / n_skills, 2),
+                "verdict_valid": critic.get("verdict") in
+                {"READY", "NEEDS_ADJUSTMENT", "CRITICAL_GAPS"},
+                "guardrail_passed": r.get("guardrail_report", {}).get("passed", False),
+                "engine": r.get("telemetry", {}).get("engine"),
+                "seconds": elapsed,
+            })
+    finally:
+        if prev_mock is None:
+            os.environ.pop("CERTFORGE_MOCK", None)
+        else:
+            os.environ["CERTFORGE_MOCK"] = prev_mock
+
+    n = len(rows) or 1
+    return {
+        "n": len(rows),
+        "llm_powered_rate": round(sum(r["assessment_llm"] and r["critic_llm"] for r in rows) / n, 2),
+        "avg_foundry_iq_grounding": round(sum(r["foundry_iq_grounding"] for r in rows) / n, 2),
+        "verdict_validity": round(sum(r["verdict_valid"] for r in rows) / n, 2),
+        "guardrail_pass_rate": round(sum(r["guardrail_passed"] for r in rows) / n, 2),
+        "avg_seconds": round(sum(r["seconds"] for r in rows) / n, 1),
+        "per_learner": rows,
+    }
+
+
 def format_report(results: dict) -> str:
     """Human-readable summary for the CLI / README."""
     acc, g, s, f = (results["predictive_accuracy"], results["groundedness"],

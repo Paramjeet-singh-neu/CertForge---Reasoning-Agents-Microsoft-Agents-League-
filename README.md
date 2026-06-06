@@ -128,6 +128,9 @@ are fully implemented in [llm.py](certforge/src/llm.py).
   **leave-one-out validation** against actual exam outcomes:
   **accuracy 0.93, precision 1.00, recall 0.89, F1 0.94 (14/15)**,
   plus groundedness, output-guardrail, and **per-role fairness** checks.
+  A **live-mode eval** (`evaluate_live`) runs a sample through the *real* LLM
+  agents and confirms LLM-powered rate, managed-Foundry-IQ grounding, verdict
+  validity, and guardrail pass (all 100% on the sample).
 - **Responsible-AI guardrails** ([guardrails.py](certforge/src/safety/guardrails.py)) —
   following Microsoft's **Discover → Protect → Govern** model:
   - **Discover** — an **adversarial safety suite** (PII, prompt injection, out-of-scope,

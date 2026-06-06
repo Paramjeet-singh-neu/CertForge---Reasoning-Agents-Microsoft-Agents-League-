@@ -1,0 +1,10 @@
+# Streamlit theme for CertForge — clean, Azure-flavoured.
+[theme]
+primaryColor = "#0078D4"            # Azure blue
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F3F6FB"
+textColor = "#1B1F23"
+font = "sans serif"
+
+[server]
+headless = true
