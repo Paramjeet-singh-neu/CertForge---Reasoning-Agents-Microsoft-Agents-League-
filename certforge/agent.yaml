@@ -22,6 +22,12 @@ environment_variables:
     # response completes within the hosted request timeout.
     - name: CERTFORGE_MAX_LOOPS
       value: "1"
+    # Foundry IQ grounding layer — managed Azure AI Search KB. Auth via the
+    # agent's managed identity (Search Index Data Reader), NO api-key baked in.
+    - name: FOUNDRY_IQ_ENDPOINT
+      value: "https://certforge-kb-15510.search.windows.net"
+    - name: FOUNDRY_IQ_KB
+      value: "certforge-kb"
     # Monitoring: OpenTelemetry -> App Insights. Uses CERTFORGE_APPI_CONN because
     # APPLICATIONINSIGHTS_CONNECTION_STRING is reserved/managed by Agent Service.
     - name: CERTFORGE_APPI_CONN_HEX

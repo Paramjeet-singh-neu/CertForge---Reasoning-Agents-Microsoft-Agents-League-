@@ -55,6 +55,14 @@ def test_evaluation_predictive_accuracy_is_strong():
     assert results["safety"]["output_guardrail_pass_rate"] == 1.0
 
 
+def test_adversarial_safety_suite_all_pass():
+    suite = guardrails.run_safety_suite()
+    # Every adversarial case (PII, injection, out-of-scope, real name) + the
+    # valid case must be handled as expected.
+    assert suite["passed"] == suite["total"]
+    assert suite["pass_rate"] == 1.0
+
+
 def test_evaluation_reports_fairness():
     results = evaluate.evaluate_all()
     assert "predicted_pass_rate_by_role" in results["fairness"]

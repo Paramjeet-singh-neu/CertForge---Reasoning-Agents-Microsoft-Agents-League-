@@ -12,7 +12,7 @@ The capacity rule comes straight from the synthetic Workload Insights Report:
 """
 from __future__ import annotations
 
-from .. import config
+from .. import work_iq
 from .base import Agent
 
 HIGH_MEETING_THRESHOLD = 20
@@ -24,10 +24,12 @@ class EngagementAgent(Agent):
 
     def _run_mock(self, context: dict) -> dict:
         profile = context["learner_profile"]
-        signal = config.get_work_signal(profile["employee_id"]) or {}
-        meeting = signal.get("meeting_hours_per_week", 18)
-        focus = signal.get("focus_hours_per_week", 14)
-        slot = signal.get("preferred_learning_slot", "Morning")
+        # Pull work context from the Work IQ layer (synthetic source; swappable
+        # to the real Work IQ API / Microsoft Graph in production).
+        wctx = work_iq.get_work_context(profile["employee_id"])
+        meeting = wctx["meeting_hours_per_week"]
+        focus = wctx["focus_hours_per_week"]
+        slot = wctx["preferred_learning_slot"]
         needed = profile.get("available_hours_per_week", 6)
 
         # Capacity risk: high meeting load OR not enough focus headroom for study.
@@ -57,6 +59,11 @@ class EngagementAgent(Agent):
                 "preferred_slot": slot,
                 "capacity_risk": risk,
                 "capacity_reasoning": capacity_reasoning,
+                # Work IQ derived insights:
+                "collaboration_load": wctx["collaboration_load"],
+                "availability": wctx["availability"],
+                "flow_of_work_note": wctx["flow_of_work_note"],
+                "work_iq_source": wctx["source"],
             },
             "study_windows": windows,
             "reminder_strategy": {

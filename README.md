@@ -81,7 +81,8 @@ deterministic so its numbers are trustworthy, not an LLM's guess.
 5. **Reasoning trace viewer** — every agent's decision chain, inspectable.
 
 ### Reasoning patterns
-Planner–Executor · Critic/Verifier · Self-reflection · Role specialisation · Feedback loop.
+Planner–Executor · Critic/Verifier · Self-reflection · Role specialisation · Feedback loop ·
+**Human-in-the-loop** ("Ready to be assessed?" gate: `run_prep` → human confirm → `run_assessment`).
 
 ---
 
@@ -128,9 +129,13 @@ are fully implemented in [llm.py](certforge/src/llm.py).
   **accuracy 0.93, precision 1.00, recall 0.89, F1 0.94 (14/15)**,
   plus groundedness, output-guardrail, and **per-role fairness** checks.
 - **Responsible-AI guardrails** ([guardrails.py](certforge/src/safety/guardrails.py)) —
-  input gate (blocks PII / non-synthetic IDs / unknown certs), output validation
-  (verdict/score bounds, probability sums, citation presence), a transparency
-  notice, and a **deterministic verdict guardrail** bounding the LLM's decision.
+  following Microsoft's **Discover → Protect → Govern** model:
+  - **Discover** — an **adversarial safety suite** (PII, prompt injection, out-of-scope,
+    real names) red-teams the input guardrail (6/6 handled).
+  - **Protect** — input gate (blocks PII / non-synthetic IDs / unknown certs), output
+    validation (verdict/score bounds, probability sums, citations), a **verdict
+    guardrail** bounding the LLM's decision, and a transparency notice.
+  - **Govern** — telemetry + Application Insights monitoring.
 - **Telemetry** ([telemetry.py](certforge/src/telemetry.py)) — per-agent latency,
   an append-only JSONL trace, and an OpenTelemetry-shaped span helper.
 

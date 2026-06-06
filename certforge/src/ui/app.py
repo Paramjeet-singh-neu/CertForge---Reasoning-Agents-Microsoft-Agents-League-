@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import pandas as pd  # noqa: E402
 import streamlit as st  # noqa: E402
 
-from src import config, telemetry  # noqa: E402
+from src import config, fabric_iq, telemetry  # noqa: E402
 from src.agents.predictor import OutcomePredictor  # noqa: E402
 from src.evaluation import evaluate  # noqa: E402
 from src.memory import procedural_memory  # noqa: E402
@@ -85,26 +85,83 @@ def learner_view():
         help="Free-text topics — the Learning Path Curator prioritises matching skills.")
     st.caption(f"Role: **{learner['role']}**  ·  Team signal loaded from Work IQ")
 
-    if st.button("🚀 Analyse Readiness", type="primary"):
-        with st.spinner("Agents reasoning..."):
-            st.session_state.result = runner.run_analysis(
+    # --- Step 1: PREP (Curator / Study Plan / Engagement) ----------------
+    if st.button("📋 Build Study Plan & Engagement", type="primary"):
+        with st.spinner("Curating path, planning, reading Work IQ..."):
+            st.session_state.prep = runner.run_prep(
                 emp, learner["role"], cert, hours, topics=topics)
+            st.session_state.result = None  # reset any prior assessment
 
-    result = st.session_state.get("result")
-    if not result or result["learner_profile"]["employee_id"] != emp:
-        st.info("Select a learner and click **Analyse Readiness**.")
+    prep = st.session_state.get("prep")
+    if not prep or prep["learner_profile"]["employee_id"] != emp:
+        st.info("Pick a learner and click **Build Study Plan & Engagement**.")
+        return
+    if prep.get("blocked"):
+        st.error("Request blocked by guardrail: " +
+                 "; ".join(prep["guardrail_report"]["violations"]))
         return
 
-    # --- Agent activity ---------------------------------------------------
+    result = st.session_state.get("result")
+
+    # --- Agent activity (live) -------------------------------------------
     with st.expander("🧠 Agent Activity", expanded=True):
-        if result.get("memory_patterns_applied"):
-            st.caption("Memory patterns applied: " +
-                       "; ".join(result["memory_patterns_applied"]))
-        agent_activity(result["event_log"])
+        if prep.get("memory_patterns_applied"):
+            st.caption("Memory patterns applied: " + "; ".join(prep["memory_patterns_applied"]))
+        agent_activity((result or prep)["event_log"])
+
+    # --- Learning path (Curator: Foundry IQ + MS Learn MCP) --------------
+    cur = prep.get("curator", {})
+    with st.expander("📚 Learning Path (Foundry IQ + MS Learn MCP)", expanded=False):
+        matched = cur.get("topics_matched_to_skills")
+        if matched:
+            st.caption(f"🎯 Prioritised your requested topics: {', '.join(matched)}")
+        for s in cur.get("required_skills", []):
+            mods = " · ".join(f"[{m['source']}] {m['title']}" for m in s.get("modules", []))
+            st.markdown(f"- **{s['skill']}** ({s['priority']}) — {mods}")
+
+    # --- Study plan ------------------------------------------------------
+    plan = prep.get("study_plan", {}).get("plan", {})
+    st.markdown(f"#### 📅 Study Plan — {plan.get('total_weeks','?')} weeks · "
+                f"{plan.get('total_hours','?')} hrs · target {plan.get('target_exam_date','?')}")
+
+    # --- Work IQ -> Engagement & reminders -------------------------------
+    eng = prep.get("engagement", {})
+    reminders = eng.get("reminder_schedule", [])
+    if reminders:
+        with st.expander("🗓️ Work IQ → Engagement (Study Windows & Reminders)", expanded=False):
+            wa = eng.get("work_analysis", {})
+            st.markdown("**Work IQ signals**")
+            st.caption(f"{wa.get('meeting_hours','?')} mtg hrs / {wa.get('focus_hours','?')} "
+                       f"focus hrs · preferred {wa.get('preferred_slot','?')} · "
+                       f"collaboration **{wa.get('collaboration_load','?')}** · "
+                       f"availability **{wa.get('availability','?')}**")
+            if wa.get("flow_of_work_note"):
+                st.caption(f"🧭 {wa['flow_of_work_note']}")
+            st.caption(f"_source: {wa.get('work_iq_source','synthetic')}_")
+            rs = eng.get("reminder_strategy", {})
+            st.caption(f"Cadence: **{rs.get('frequency')}** · tone {rs.get('tone')} · "
+                       f"{rs.get('escalation')}")
+            st.dataframe(pd.DataFrame([
+                {"Day": r["day"], "Time": r["time"], "Channel": r.get("channel", ""),
+                 "Reminder": r["message"]} for r in reminders
+            ]), use_container_width=True, hide_index=True)
+
+    # --- HUMAN-IN-THE-LOOP gate ------------------------------------------
+    if not result:
+        st.divider()
+        gate = prep.get("human_gate", {})
+        st.warning(f"🧑‍⚖️ **Human-in-the-loop — {gate.get('question','Ready to be assessed?')}**\n\n"
+                   f"{gate.get('summary','')}")
+        if not st.button("✅ Confirm ready → Run Assessment", type="primary"):
+            st.caption("Review the plan above. Assessment runs only after you confirm.")
+            return
+        with st.spinner("Assessment + critic debate + prediction..."):
+            st.session_state.result = runner.run_assessment(prep)
+        result = st.session_state.result
 
     st.divider()
 
-    # --- Readiness report -------------------------------------------------
+    # --- Readiness report (post human gate) ------------------------------
     a = result["assessment"]["assessment"]
     verdict = result["critic"]["verdict"]
     loops = result["loop_iterations_run"]
@@ -117,28 +174,8 @@ def learner_view():
                    f"{a['overall_score']}% across {loops} feedback iterations.")
 
     st.markdown("#### Skill Scores")
-    matched = result.get("curator", {}).get("topics_matched_to_skills")
-    if matched:
-        st.caption(f"🎯 Prioritised your requested topics: {', '.join(matched)}")
     for s in a["skill_scores"]:
         score_bar(s["skill"], s["score"], s["status"])
-
-    # --- Engagement: study windows + adaptive reminder schedule -----------
-    eng = result.get("engagement", {})
-    reminders = eng.get("reminder_schedule", [])
-    if reminders:
-        with st.expander("📅 Engagement — Study Windows & Reminder Schedule", expanded=False):
-            wa = eng.get("work_analysis", {})
-            st.caption(f"Capacity risk: **{wa.get('capacity_risk','?').upper()}** · "
-                       f"{wa.get('meeting_hours','?')} mtg hrs / {wa.get('focus_hours','?')} "
-                       f"focus hrs · preferred {wa.get('preferred_slot','?')}")
-            rs = eng.get("reminder_strategy", {})
-            st.caption(f"Cadence: **{rs.get('frequency')}** · tone {rs.get('tone')} · "
-                       f"{rs.get('escalation')}")
-            st.dataframe(pd.DataFrame([
-                {"Day": r["day"], "Time": r["time"], "Channel": r.get("channel", ""),
-                 "Reminder": r["message"]} for r in reminders
-            ]), use_container_width=True, hide_index=True)
 
     # --- Gamification -----------------------------------------------------
     g = result["manager_individual"]["gamification"]
@@ -231,6 +268,19 @@ def manager_view():
 
     st.info("🧠 " + ti["memory_insight"])
 
+    # --- Fabric IQ ontology (semantic layer behind the insights) ----------
+    onto = fabric_iq.ontology()
+    if onto:
+        with st.expander("🧩 Fabric IQ — Semantic Ontology (entities · relationships · rules)"):
+            st.caption("The shared business semantics driving planning, analytics, and agents.")
+            st.markdown("**Entities:** " + ", ".join(e["name"] for e in onto.get("entities", [])))
+            st.markdown("**Relationships:**")
+            for r in onto.get("relationships", []):
+                st.markdown(f"- `{r['from']}` → **{r['type']}** → `{r['to']}`")
+            st.markdown("**Business rules:**")
+            for r in onto.get("rules", []):
+                st.markdown(f"- **{r['id']}** — {r['description']}")
+
 
 # ---------------------------------------------------------------------------
 # Reasoning trace view
@@ -299,6 +349,16 @@ def reliability_view():
         ]), use_container_width=True, hide_index=True)
     else:
         st.info("No telemetry yet — run a learner or team analysis first.")
+
+    st.divider()
+    st.markdown("#### 🛡️ Adversarial Safety Tests (Responsible AI — *Discover*)")
+    suite = guardrails.run_safety_suite()
+    st.caption(f"Input guardrail vs. red-team prompts: **{suite['passed']}/{suite['total']} "
+               f"handled correctly** (PII, prompt injection, out-of-scope, real names).")
+    st.dataframe(pd.DataFrame([
+        {"Case": c["case"], "Expected": c["expected"], "Actual": c["actual"],
+         "✓": "✅" if c["passed"] else "❌"} for c in suite["cases"]
+    ]), use_container_width=True, hide_index=True)
 
     st.divider()
     st.markdown("#### 🤝 Transparency")

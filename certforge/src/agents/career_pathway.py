@@ -5,7 +5,7 @@ to find the next certification in the learner's career path and previews a plan.
 """
 from __future__ import annotations
 
-from .. import config
+from .. import config, fabric_iq
 from .base import Agent
 
 
@@ -14,12 +14,17 @@ class CareerPathwayAgent(Agent):
 
     def _run_mock(self, context: dict) -> dict:
         profile = context["learner_profile"]
-        current = config.get_certification(profile["certification"])
-        next_id = current.get("next_cert") if current else None
+        completed = profile["certification"]
+        # Fabric IQ ontology: next cert + the prerequisite RULE.
+        next_id = fabric_iq.next_cert(completed)
         next_cert = config.get_certification(next_id) if next_id else None
+        # The learner has just completed `completed`, so the next cert's
+        # prerequisite is satisfied iff it requires `completed` (or nothing).
+        prereq_ok = next_cert is None or fabric_iq.prerequisite_satisfied(
+            next_id, [completed])
 
         weekly = profile.get("available_hours_per_week", 4)
-        if next_cert:
+        if next_cert and prereq_ok:
             est_weeks = max(1, -(-next_cert["recommended_hours"] // weekly))
             pathway = {
                 "completed": profile["certification"],
@@ -45,7 +50,8 @@ class CareerPathwayAgent(Agent):
             "pathway": pathway,
             "career_timeline": profile.get("career_path", [profile["certification"]]),
             "reasoning_trace": self.trace(
-                f"Queried Fabric IQ for next cert after {profile['certification']}",
+                f"Queried Fabric IQ ontology for next cert after {completed}",
+                f"Applied prerequisite rule: {next_id or 'n/a'} prerequisite satisfied = {prereq_ok}",
                 f"Next step: {pathway.get('next') or 'none (track complete)'}",
             ),
         }

@@ -14,5 +14,31 @@
     {"team_id":"TEAM-A","manager":"MGR-001","target_cert":"AZ-204","deadline":"2026-08-01"},
     {"team_id":"TEAM-B","manager":"MGR-002","target_cert":"Mixed","deadline":"2026-09-01"},
     {"team_id":"TEAM-C","manager":"MGR-003","target_cert":"AZ-400","deadline":"2026-08-15"}
-  ]
+  ],
+  "ontology": {
+    "entities": [
+      {"name":"Learner","key":"employee_id","properties":["role","practice_score_avg","hours_studied","practice_exams_taken","study_slot"]},
+      {"name":"Role","key":"role","properties":["primary_cert","secondary_cert","career_path"]},
+      {"name":"Certification","key":"id","properties":["skills","recommended_hours","pass_threshold","prerequisite","difficulty","next_cert"]},
+      {"name":"Skill","key":"name","properties":["certification"]},
+      {"name":"SkillGap","derived":true,"definition":"a Skill whose assessment score is below pass_threshold for the learner"},
+      {"name":"ReadinessScore","derived":true,"definition":"mean of per-skill assessment scores (0-100)"},
+      {"name":"StudyPlan","derived":true,"properties":["total_weeks","total_hours","milestones","revision_focus"]},
+      {"name":"Team","key":"team_id","properties":["manager","target_cert","deadline"]}
+    ],
+    "relationships": [
+      {"from":"Learner","to":"Role","type":"has_role"},
+      {"from":"Role","to":"Certification","type":"targets","via":["primary_cert","career_path"]},
+      {"from":"Certification","to":"Skill","type":"requires"},
+      {"from":"Certification","to":"Certification","type":"prerequisite_of"},
+      {"from":"Learner","to":"Team","type":"member_of"},
+      {"from":"Learner","to":"SkillGap","type":"exhibits"}
+    ],
+    "rules": [
+      {"id":"readiness","description":"A learner is READY when ReadinessScore >= pass_threshold AND no individual Skill score < 65.","threshold_field":"pass_threshold","min_skill_score":65},
+      {"id":"prerequisite","description":"A Certification may only be recommended if its prerequisite (if any) is satisfied.","applies_to":"next_cert / career_path"},
+      {"id":"role_alignment","description":"A learner's primary Certification is determined by their Role.","source":"roles[].primary_cert"},
+      {"id":"capacity","description":"When meeting load > 20 hrs/week, extend the StudyPlan timeline by ~25%.","threshold":20,"adjustment":0.25}
+    ]
+  }
 }

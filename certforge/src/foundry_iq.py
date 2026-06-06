@@ -21,11 +21,23 @@ def _mcp_url() -> str:
             f"/mcp?api-version={config.FOUNDRY_IQ_API_VERSION}")
 
 
+def _auth_headers() -> dict:
+    """api-key when available (local dev); otherwise a managed-identity bearer
+    token (hosted agent) — no secret baked into the container."""
+    if config.FOUNDRY_IQ_KEY:
+        return {"api-key": config.FOUNDRY_IQ_KEY}
+    from azure.identity import (AzureCliCredential, ChainedTokenCredential,
+                                DefaultAzureCredential)
+    cred = ChainedTokenCredential(AzureCliCredential(), DefaultAzureCredential())
+    token = cred.get_token("https://search.azure.com/.default").token
+    return {"Authorization": f"Bearer {token}"}
+
+
 async def _retrieve_async(queries: list[str]) -> list[dict]:
     from mcp import ClientSession
     from mcp.client.streamable_http import streamablehttp_client
 
-    async with streamablehttp_client(_mcp_url(), headers={"api-key": config.FOUNDRY_IQ_KEY}) as (
+    async with streamablehttp_client(_mcp_url(), headers=_auth_headers()) as (
             read, write, _):
         async with ClientSession(read, write) as session:
             await session.initialize()

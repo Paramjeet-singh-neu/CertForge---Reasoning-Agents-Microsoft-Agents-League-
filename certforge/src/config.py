@@ -67,7 +67,9 @@ FOUNDRY_IQ_API_VERSION = os.getenv("FOUNDRY_IQ_API_VERSION", "2026-05-01-preview
 
 
 def foundry_iq_enabled() -> bool:
-    return bool(FOUNDRY_IQ_ENDPOINT and FOUNDRY_IQ_KB and FOUNDRY_IQ_KEY)
+    # Enabled with an api-key (local dev) OR via managed identity (hosted agent:
+    # endpoint + kb present, auth comes from the agent's Entra identity).
+    return bool(FOUNDRY_IQ_ENDPOINT and FOUNDRY_IQ_KB)
 
 
 # ---------------------------------------------------------------------------

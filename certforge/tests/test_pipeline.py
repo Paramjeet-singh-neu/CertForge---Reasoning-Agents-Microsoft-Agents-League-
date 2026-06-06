@@ -50,6 +50,18 @@ def test_team_heatmap_has_mixed_risk():
     assert "high" in risks and "low" in risks
 
 
+def test_human_in_the_loop_gate():
+    # Prep stage stops at the human gate — no assessment yet.
+    prep = runner.run_prep("EMP-001", "Cloud Engineer", "AZ-204", 6)
+    assert prep["human_gate"]["stage"] == "awaiting_confirmation"
+    assert "assessment" not in prep
+    assert "curator" in prep and "study_plan" in prep  # prep agents ran
+    # After human confirmation, assessment proceeds.
+    full = runner.run_assessment(prep)
+    assert full["human_gate"]["stage"] == "confirmed"
+    assert full["critic"]["verdict"] in {"READY", "NEEDS_ADJUSTMENT", "CRITICAL_GAPS"}
+
+
 def test_procedural_memory_learns():
     runner.run_analysis("EMP-001", "Cloud Engineer", "AZ-204", 6)
     assert len(pm.all_patterns()) >= 5

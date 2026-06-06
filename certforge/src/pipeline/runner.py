@@ -41,14 +41,24 @@ PARALLEL_AGENTS = [
 ]
 
 
-def run_analysis(employee_id: str, role: str, certification: str,
-                 available_hours_per_week: int = 6, topics: str = "") -> dict:
-    """Run the full multi-agent analysis for one learner. Returns the result dict.
+def _recorder(event_log: list[dict]):
+    def record(out: dict):
+        event_log.append({
+            "agent": out.get("agent_name"),
+            "elapsed_seconds": out.get("elapsed_seconds"),
+            "trace": out.get("reasoning_trace", []),
+        })
+    return record
 
-    `topics` is optional free-text the learner wants to focus on (baseline-flow
-    step 1); the Curator uses it to prioritise matching skills.
+
+def run_prep(employee_id: str, role: str, certification: str,
+             available_hours_per_week: int = 6, topics: str = "") -> dict:
+    """Prep stage: Orchestrator + Curator/Study Plan/Engagement/Patterns, then
+    STOP at the human-in-the-loop gate ("Ready to be assessed?").
+
+    Returns a context with `human_gate` awaiting confirmation. Call run_assessment
+    to continue once the human confirms.
     """
-    # INPUT GUARDRAIL: gate the request before any agent runs.
     ok, issues = guardrails.validate_input(employee_id, role, certification)
     if not ok:
         return {
@@ -69,15 +79,9 @@ def run_analysis(employee_id: str, role: str, certification: str,
         },
         "learner_topics": topics.strip(),
         "loop_iteration": 1,
+        "event_log": [],
     }
-    event_log: list[dict] = []
-
-    def record(out: dict):
-        event_log.append({
-            "agent": out.get("agent_name"),
-            "elapsed_seconds": out.get("elapsed_seconds"),
-            "trace": out.get("reasoning_trace", []),
-        })
+    record = _recorder(context["event_log"])
 
     # --- Orchestrator: plan ------------------------------------------------
     plan = Orchestrator().run(context)
@@ -91,6 +95,32 @@ def run_analysis(employee_id: str, role: str, certification: str,
         out = AgentCls().run(context)
         context[key] = out
         record(out)
+
+    # --- HUMAN-IN-THE-LOOP GATE -------------------------------------------
+    # Prep is done. A human (learner/manager) reviews the plan and decides
+    # whether the learner is ready to be assessed before assessment runs.
+    context["human_gate"] = {
+        "stage": "awaiting_confirmation",
+        "question": "Ready to be assessed?",
+        "summary": (f"Study plan ready: {context['study_plan']['plan']['total_weeks']} weeks, "
+                    f"{context['study_plan']['plan']['total_hours']} hrs. "
+                    f"Capacity risk: {context['engagement']['work_analysis']['capacity_risk']}."),
+    }
+    context["event_log"].append({"agent": "HumanInTheLoop", "trace": [
+        "Prep complete — awaiting human confirmation: 'Ready to be assessed?'"]})
+    return context
+
+
+def run_assessment(context: dict) -> dict:
+    """Assessment stage (post human gate): reasoning agents + feedback loop +
+    branch + manager synthesis + memory. Mutates and returns the context."""
+    context.setdefault("event_log", [])
+    record = _recorder(context["event_log"])
+    certification = context["learner_profile"]["certification"]
+    if context.get("human_gate"):
+        context["human_gate"]["stage"] = "confirmed"
+        context["event_log"].append({"agent": "HumanInTheLoop", "trace": [
+            "Human confirmed readiness — proceeding to assessment."]})
 
     # --- Sequential reasoning + feedback loop ------------------------------
     assessment_history: list[dict] = []
@@ -129,7 +159,7 @@ def run_analysis(employee_id: str, role: str, certification: str,
                     "confidence": 0.75,
                 }],
             }
-            event_log.append({"agent": "FeedbackLoop", "trace": [
+            context["event_log"].append({"agent": "FeedbackLoop", "trace": [
                 f"Iteration {iteration}: revised plan (+{cumulative_hours} hrs, "
                 f"+{cumulative_exams} practice exam(s)) → "
                 f"predicted pass rate now {int(context['patterns']['pass_rate']*100)}%"]})
@@ -171,13 +201,25 @@ def run_analysis(employee_id: str, role: str, certification: str,
     # --- Learn into procedural memory --------------------------------------
     context["patterns_learned"] = procedural_memory.learn_from_result(certification, context)
 
-    context["event_log"] = event_log
     # OUTPUT GUARDRAIL: attach a well-formedness + safety report.
     guardrails.assert_safe_output(context)
     # TELEMETRY: record an observability summary + append to the trace log.
     from .. import telemetry
     context["telemetry"] = telemetry.record(context)
     return context
+
+
+def run_analysis(employee_id: str, role: str, certification: str,
+                 available_hours_per_week: int = 6, topics: str = "") -> dict:
+    """Full analysis = prep + assessment (auto-confirms the human gate).
+
+    Used by team batch mode, the hosted agent endpoint, and tests. The UI uses
+    run_prep / run_assessment separately to surface the human-in-the-loop gate.
+    """
+    prep = run_prep(employee_id, role, certification, available_hours_per_week, topics)
+    if prep.get("blocked"):
+        return prep
+    return run_assessment(prep)
 
 
 def run_team_analysis(employee_ids: list[str]) -> dict:
