@@ -1,67 +1,75 @@
-# 🎬 CertForge — Demo Script (~4 minutes)
+# 🎬 CertForge — Demo Script (~5 minutes, timed)
 
-A tight walkthrough that shows reasoning, all three IQ layers, the feedback loop,
-and the reliability story. Run `streamlit run certforge/src/ui/app.py` first.
+A turnkey recording script. Two tabs open before you start:
+- **Browser A** — the Streamlit app (`streamlit run certforge/src/ui/app.py` → http://localhost:8501)
+- **Browser B** — the Azure Foundry portal ([ai.azure.com](https://ai.azure.com)), signed in
 
-> Tip: set `CERTFORGE_MOCK=false` in `certforge/.env` for the live LLM demo
-> (the Assessment + Critic "think" with gpt-4o-mini). Keep `true` for an instant,
-> offline, demo-safe run. The sidebar badge shows which engine is active.
-
----
-
-## 0. Framing (15s)
-> "CertForge is an 8-agent system that doesn't just say whether you're ready for a
-> certification — it **debates** it, **predicts** your outcome, and **gets smarter**
-> with every learner. Everything here is synthetic data."
-
-## 1. Learner View — the at-risk story (90s)
-- Select **EMP-001**, target **AZ-204**, click **🚀 Analyse Readiness**.
-- **Agent Activity** panel: point out the parallel agents, then the Assessment →
-  Critic → Predictor chain, and the **🔄 feedback loop** firing.
-- Talking points:
-  - "The Critic **challenged** the assessment using historical evidence — only
-    ~27% of similar learners passed."
-  - "The feedback loop re-planned the weak areas and re-ran the chain — the score
-    climbed **66% → 80%** and it converged to **READY**."
-- Scroll to **skill bars**, **gamification**, **outcome prediction**.
-
-## 2. What-If Simulator (30s)
-- Drag **Additional study hours** and toggle **morning study**.
-- "Pass probability recomputes **live** — using the *same* model the predictor
-  used, so the demo number can't contradict the agent."
-
-## 3. Career Pathway (15s)
-- "Because EMP-001 reached READY, the system previews the next cert — **AZ-305** —
-  sized to their work capacity."
-
-## 4. Reasoning Trace (30s)
-- Switch to **🔍 Reasoning Trace**.
-- Expand the **Assessment** agent → show the **self-reflection** log.
-- Expand the **Critic** → show the evidence-backed challenge.
-- "Every decision is inspectable — full observability."
-
-## 5. Manager View — team batch (45s)
-- Switch to **📊 Manager**, click **👥 Run Team Analysis**.
-- "One click processes the whole team into a **risk heatmap** — current standing,
-  not the rosy post-study ending."
-- Point out the **capacity alert** (EMP-004, 25 meeting hrs) and the
-  **procedural-memory insights** aggregated across learners.
-
-## 6. Reliability & Safety — the closer (45s)
-- Switch to **🛡️ Reliability**, click **📏 Run Evaluation**.
-- "We validate against **ground truth**: leave-one-out, **93% accuracy, 0.94 F1**."
-- "Groundedness and output guardrails at 100%, and we **measure fairness** across
-  roles — surfacing bias, not hiding it."
-- Point to the **telemetry** table and the **transparency notice**.
+> **Engine for the demo:** keep `CERTFORGE_MOCK=true` in `certforge/.env` for the
+> on-screen walkthrough (instant, reliable). Show **one** real Foundry run at the
+> end (Reliability → Live-mode Eval, or the hosted endpoint). Don't run the whole
+> UI live — gpt-oss is ~50s/step.
 
 ---
 
-## The three IQ layers (mention naturally)
-- **Foundry IQ** — cited questions/content come from real retrieval over approved docs.
-- **Fabric IQ** — the role→cert→skills→threshold semantic model drives planning.
-- **Work IQ** — meeting/focus signals drive study windows and capacity risk.
+## 0:00 – 0:25 — Framing
+> "CertForge is an **8-agent enterprise certification-intelligence system** on
+> Microsoft Foundry. It doesn't just say whether you're ready for a cert — it
+> **curates a plan, debates your readiness, predicts your outcome, loops to
+> improve, and gets smarter with every learner**. Everything here is synthetic
+> data. It runs on real Foundry services — a deployed Hosted Agent, Foundry IQ,
+> and gpt-oss-120b."
 
-## One-liner to close
-> "Eight agents, three IQ layers, a feedback loop that argues with itself, and
-> predictions validated at 93% — all running with a one-flag mock fallback so the
-> demo never breaks."
+Point at the sidebar: **engine + all three IQ layers (🟢🟢🟢)**.
+
+## 0:25 – 2:00 — Learner View: the at-risk story + human-in-the-loop
+1. Pick **EMP-001**, target **AZ-204**, type topics **"Storage, Monitoring"**.
+2. Click **📋 Build Study Plan & Engagement**.
+   - Open **🧠 Agent Activity** — narrate the parallel agents (Curator, Study Plan, Engagement, Pattern Analyst).
+   - Open **📚 Learning Path** — "cited modules, with **real learn.microsoft.com URLs from the MS Learn MCP server**."
+   - Open **🗓️ Work IQ → Engagement** — "Work IQ signals → capacity risk **HIGH** (22 meeting hrs), study windows, and an **adaptive reminder schedule**."
+3. **Stop at the gate:** "Here's the **human-in-the-loop** checkpoint — *Ready to be assessed?* A human decides before assessment runs." Click **✅ Confirm ready → Run Assessment**.
+4. Narrate the result:
+   - The **color-coded verdict banner** (starts at risk, ends **✅ READY** after the loop).
+   - "The **Readiness Critic debated** the assessment with historical evidence; the **feedback loop** re-planned weak areas and the score climbed **66% → 80%**."
+   - **Skill bars**, **gamification**.
+
+## 2:00 – 2:45 — What-If + Career Pathway
+- **🔮 Outcome Prediction** (pass/borderline/fail) → drag the **What-If sliders** (hours, exams, morning) — "pass probability recomputes **live**, using the same model the predictor used."
+- **🗺️ Career Pathway** — "Because they're READY, Fabric IQ's **prerequisite rule** clears the next step: **AZ-305**."
+
+## 2:45 – 3:15 — Reasoning Trace
+- Switch to **🔍 Reasoning Trace**. Expand **AssessmentAgent** (self-reflection) and **ReadinessCritic** (evidence-backed challenge). "Every decision is inspectable."
+
+## 3:15 – 4:00 — Manager View
+- Switch to **📊 Manager** → **👥 Run Team Analysis**.
+- **Risk heatmap** (mixed 🟢🟡🔴 — pre-intervention standing), **capacity alert** (EMP-004), **procedural-memory pattern insights**, **recommended actions**.
+- Open **🧩 Fabric IQ — Semantic Ontology** — "the entities, relationships, and **business rules** (readiness, prerequisite, capacity) behind every recommendation."
+
+## 4:00 – 4:40 — Reliability & Safety
+- Switch to **🛡️ Reliability** → **📏 Run Evaluation**.
+  - "**93% leave-one-out accuracy** against real outcomes, 100% groundedness, and we **measure fairness across roles**."
+- Scroll to **🛡️ Adversarial Safety Tests** — "PII, prompt injection, out-of-scope — all blocked. That's the Responsible-AI **Discover → Protect → Govern** flow."
+- *(Optional, pre-run)* **🔬 Live-mode Eval** — "validated on the real LLM: 100% LLM-powered, 100% Foundry IQ grounding." Point at the **telemetry** table + **transparency notice**.
+
+## 4:40 – 5:00 — The real Azure services (Browser B — the closer)
+Switch to the Foundry portal and show, quickly:
+1. **Build → Agents → `certforge`** → status **active**, own identity → *"a live Hosted Agent on Foundry Agent Service."* (Optional: Open in playground, send "Analyze EMP-001 for AZ-204".)
+2. **Build → Knowledge → `certforge-kb`** → *"the managed Foundry IQ knowledge base — Azure AI Search over our approved docs."*
+3. **App Insights `certforge-ai` → Investigate → Performance** → *"real OpenTelemetry traces from the hosted agent."*
+
+> **Close:** "Eight agents, all three Microsoft IQ layers, a feedback loop that
+> argues with itself, a human-in-the-loop gate, predictions validated at 93% —
+> deployed as a managed, identity-secured Hosted Agent on Microsoft Foundry."
+
+---
+
+## The three IQ layers (mention naturally as you go)
+- **Foundry IQ** — managed Azure AI Search KB; cited grounding for Curator + Assessment.
+- **Fabric IQ** — the semantic ontology (role→cert→skills→threshold→prereq) + business rules.
+- **Work IQ** — meeting/focus signals → study windows, capacity risk, reminders.
+
+## If you want a single hosted-agent proof on camera
+```bash
+azd ai agent invoke certforge "Analyze EMP-001 for AZ-204" -o raw
+```
+→ HTTP 200, `engine: azure:gpt-oss-120b`, full readiness JSON with Foundry IQ citations.
