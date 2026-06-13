@@ -3,6 +3,9 @@
 **A self-improving, multi-agent enterprise certification-intelligence system.**
 Built for the Agents League — **Reasoning Agents track (Microsoft Foundry)**.
 
+> 🎥 **Demo video:** https://youtu.be/M6jq5Ae43qo
+> 📐 **Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md)
+
 CertForge helps organisations run team certification programmes. Eight specialised
 agents plan, engage, assess, **debate**, predict, **loop**, and learn — grounded in
 Microsoft IQ layers and procedural memory. It doesn't just answer *"are you ready?"*
